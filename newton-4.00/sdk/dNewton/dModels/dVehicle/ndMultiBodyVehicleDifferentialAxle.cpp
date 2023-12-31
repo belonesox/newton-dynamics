@@ -23,7 +23,11 @@
 #include "ndNewtonStdafx.h"
 #include "ndMultiBodyVehicleDifferentialAxle.h"
 
-D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndMultiBodyVehicleDifferentialAxle)
+ndMultiBodyVehicleDifferentialAxle::ndMultiBodyVehicleDifferentialAxle()
+	:ndJointBilateralConstraint()
+{
+	m_maxDof = 1;
+}
 
 ndMultiBodyVehicleDifferentialAxle::ndMultiBodyVehicleDifferentialAxle(
 	const ndVector& pin0, const ndVector& upPin, ndBodyKinematic* const differentialBody0,
@@ -32,23 +36,10 @@ ndMultiBodyVehicleDifferentialAxle::ndMultiBodyVehicleDifferentialAxle(
 {
 	ndMatrix temp;
 	ndMatrix matrix0(pin0, upPin, pin0.CrossProduct(upPin), ndVector::m_wOne);
-	ndMatrix matrix1(pin1);
+	ndMatrix matrix1(ndGramSchmidtMatrix(pin1));
 	CalculateLocalMatrix(matrix0, m_localMatrix0, temp);
 	CalculateLocalMatrix(matrix1, temp, m_localMatrix1);
 	SetSolverModel(m_jointkinematicCloseLoop);
-}
-
-ndMultiBodyVehicleDifferentialAxle::ndMultiBodyVehicleDifferentialAxle(const ndLoadSaveBase::ndLoadDescriptor& desc)
-	:ndJointBilateralConstraint(ndLoadSaveBase::ndLoadDescriptor(desc))
-{
-}
-
-void ndMultiBodyVehicleDifferentialAxle::Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
-{
-	nd::TiXmlElement* const childNode = new nd::TiXmlElement(ClassName());
-	desc.m_rootNode->LinkEndChild(childNode);
-	childNode->SetAttribute("hashId", desc.m_nodeNodeHash);
-	ndJointBilateralConstraint::Save(ndLoadSaveBase::ndSaveDescriptor(desc, childNode));
 }
 
 void ndMultiBodyVehicleDifferentialAxle::JacobianDerivative(ndConstraintDescritor& desc)

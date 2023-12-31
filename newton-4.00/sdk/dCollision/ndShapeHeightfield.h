@@ -55,11 +55,8 @@ class ndShapeHeightfield: public ndShapeStaticMesh
 		m_invertedDiagonals,
 	};
 
-	D_CLASS_REFLECTION(ndShapeHeightfield);
-	D_COLLISION_API ndShapeHeightfield(
-		ndInt32 width, ndInt32 height, ndGridConstruction constructionMode,
-		ndFloat32 horizontalScale_x, ndFloat32 horizontalScale_z);
-	D_COLLISION_API ndShapeHeightfield(const ndLoadSaveBase::ndLoadDescriptor& desc);
+	D_CLASS_REFLECTION(ndShapeHeightfield,ndShapeStaticMesh)
+	D_COLLISION_API ndShapeHeightfield(ndInt32 width, ndInt32 height, ndGridConstruction constructionMode,ndFloat32 horizontalScale_x, ndFloat32 horizontalScale_z);
 	D_COLLISION_API virtual ~ndShapeHeightfield();
 
 	ndArray<ndReal>& GetElevationMap();
@@ -70,11 +67,11 @@ class ndShapeHeightfield: public ndShapeStaticMesh
 
 	protected:
 	virtual ndShapeInfo GetShapeInfo() const;
+	virtual ndUnsigned64 GetHash(ndUnsigned64 hash) const;
 	virtual ndShapeHeightfield* GetAsShapeHeightfield() { return this; }
 	virtual void DebugShape(const ndMatrix& matrix, ndShapeDebugNotify& debugCallback) const;
 	virtual ndFloat32 RayCast(ndRayCastNotify& callback, const ndVector& localP0, const ndVector& localP1, ndFloat32 maxT, const ndBody* const body, ndContactPoint& contactOut) const;
 	virtual void GetCollidingFaces(ndPolygonMeshDesc* const data) const;
-	virtual void Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const;
 
 	private: 
 	void CalculateLocalObb();
@@ -101,7 +98,9 @@ class ndShapeHeightfield: public ndShapeStaticMesh
 	static ndVector m_padding;
 	static ndVector m_elevationPadding;
 	static ndInt32 m_cellIndices[][4];
+
 	friend class ndContactSolver;
+	friend class ndFileFormatShapeStaticHeightfield;
 };
 
 inline ndArray<ndReal>& ndShapeHeightfield::GetElevationMap()

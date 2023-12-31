@@ -33,7 +33,7 @@ class ndQuaternion: public ndVector
 	public:
 	ndQuaternion(); 
 	ndQuaternion(const ndVector& quat);
-	ndQuaternion(const ndQuaternion& quat);
+	//ndQuaternion(const ndQuaternion& quat);
 	D_CORE_API ndQuaternion (const ndMatrix& matrix);
 	ndQuaternion (ndFloat32 q0, ndFloat32 q1, ndFloat32 q2, ndFloat32 q3);
 	D_CORE_API ndQuaternion (const ndVector &unit_Axis, ndFloat32 angle);
@@ -45,9 +45,12 @@ class ndQuaternion: public ndVector
 	ndQuaternion operator- (const ndQuaternion &B) const; 
 
 	D_CORE_API ndQuaternion operator* (const ndQuaternion &B) const;
+
+	D_CORE_API ndVector RotateVector(const ndVector& point) const;
+	D_CORE_API ndVector UnrotateVector(const ndVector& point) const;
+	D_CORE_API void GetEulerAngles(ndVector& euler1, ndVector& euler2) const;
 	D_CORE_API ndQuaternion Slerp(const ndQuaternion &q1, ndFloat32 t) const;
 	D_CORE_API ndVector CalcAverageOmega(const ndQuaternion &q1, ndFloat32 invdt) const;
-
 };
 
 inline ndQuaternion::ndQuaternion()
@@ -60,10 +63,10 @@ inline ndQuaternion::ndQuaternion(const ndVector& quat)
 {
 }
 
-inline ndQuaternion::ndQuaternion(const ndQuaternion& quat)
-	:ndVector(quat)
-{
-}
+//inline ndQuaternion::ndQuaternion(const ndQuaternion& quat)
+//	:ndVector(quat)
+//{
+//}
 
 inline ndQuaternion::ndQuaternion(ndFloat32 q0, ndFloat32 q1, ndFloat32 q2, ndFloat32 q3)
 	:ndVector(q0, q1, q2, q3)

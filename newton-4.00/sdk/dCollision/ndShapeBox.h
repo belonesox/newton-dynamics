@@ -28,8 +28,7 @@ D_MSV_NEWTON_ALIGN_32
 class ndShapeBox: public ndShapeConvex
 {
 	public:
-	D_CLASS_REFLECTION(ndShapeBox);
-	D_COLLISION_API ndShapeBox(const ndLoadSaveBase::ndLoadDescriptor& desc);
+	D_CLASS_REFLECTION(ndShapeBox,ndShapeConvex)
 	D_COLLISION_API ndShapeBox(ndFloat32 size_x, ndFloat32 size_y, ndFloat32 size_z);
 	D_COLLISION_API virtual ~ndShapeBox();
 
@@ -40,6 +39,7 @@ class ndShapeBox: public ndShapeConvex
 	D_COLLISION_API virtual void MassProperties();
 
 	D_COLLISION_API virtual ndShapeInfo GetShapeInfo() const;
+	D_COLLISION_API virtual ndUnsigned64 GetHash(ndUnsigned64 hash) const;
 	D_COLLISION_API virtual void CalculateAabb(const ndMatrix& matrix, ndVector& p0, ndVector& p1) const;
 	D_COLLISION_API virtual ndVector SupportVertexSpecialProjectPoint(const ndVector& point, const ndVector& dir) const;
 	D_COLLISION_API virtual ndVector SupportVertex(const ndVector& dir, ndInt32* const vertexIndex) const;
@@ -48,7 +48,6 @@ class ndShapeBox: public ndShapeConvex
 
 	D_COLLISION_API const ndConvexSimplexEdge** GetVertexToEdgeMapping() const;
 	D_COLLISION_API virtual ndInt32 CalculatePlaneIntersection(const ndVector& normal, const ndVector& point, ndVector* const contactsOut) const;
-	D_COLLISION_API virtual void Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const;
 
 	ndVector m_size[2];
 	ndVector m_vertex[8];
@@ -60,6 +59,7 @@ class ndShapeBox: public ndShapeConvex
 	static ndConvexSimplexEdge m_edgeArray[];
 	static ndConvexSimplexEdge* m_edgeEdgeMap[];
 	static ndConvexSimplexEdge* m_vertexToEdgeMap[];
+	friend class ndFileFormatShapeConvexBox;
 
 } D_GCC_NEWTON_ALIGN_32;
 

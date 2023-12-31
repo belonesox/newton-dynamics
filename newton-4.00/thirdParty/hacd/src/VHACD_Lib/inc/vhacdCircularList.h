@@ -15,7 +15,7 @@
 #pragma once
 #ifndef ND_VHACD_CIRCULAR_LIST_H
 #define ND_VHACD_CIRCULAR_LIST_H
-#include <stdlib.h>
+#include "vhacdDefines.h"
 
 namespace nd_
 {
@@ -63,7 +63,7 @@ namespace nd_
 			{
 				while (Delete())
 					;
-			};
+			}
 			const CircularList& operator=(const CircularList& rhs);
 			//!    Constructor
 			CircularList()
@@ -73,7 +73,7 @@ namespace nd_
 			}
 			CircularList(const CircularList& rhs);
 			//! Destructor
-			~CircularList(void) { Clear(); };
+			~CircularList(void) { Clear(); }
 		private:
 			CircularListElement<T>* m_head; //!< a pointer to the head of the circular list
 			size_t m_size; //!< number of element in the circular list

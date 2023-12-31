@@ -34,13 +34,27 @@ class ndConvexCastNotify : public ndClassAlloc
 {
 	public: 
 	ndConvexCastNotify()
-		:m_normal(ndVector::m_zero)
+		:ndClassAlloc()
+		,m_normal(ndVector::m_zero)
 		,m_closestPoint0(ndVector::m_zero)
 		,m_closestPoint1(ndVector::m_zero)
 		,m_contacts()
 		,m_param(ndFloat32 (1.2f))
+		,m_cachedScene(nullptr)
 	{
 	}
+
+	ndConvexCastNotify(const ndConvexCastNotify& src)
+		:ndClassAlloc(src)
+		,m_normal(src.m_normal)
+		,m_closestPoint0(src.m_closestPoint0)
+		,m_closestPoint1(src.m_closestPoint1)
+		,m_contacts(src.m_contacts)
+		,m_param(src.m_param)
+		,m_cachedScene(src.m_cachedScene)
+	{
+	}
+
 
 	virtual ~ndConvexCastNotify()
 	{
@@ -67,6 +81,7 @@ class ndConvexCastNotify : public ndClassAlloc
 	ndVector m_closestPoint1;
 	ndFixSizeArray<ndContactPoint, 8> m_contacts;
 	ndFloat32 m_param;
+	ndScene* m_cachedScene;
 } D_GCC_NEWTON_ALIGN_32;
 
 #endif

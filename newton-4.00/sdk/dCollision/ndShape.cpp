@@ -54,19 +54,6 @@ ndShape::~ndShape()
 	ndAssert(m_refCount.load() == 0);
 }
 
-void ndShape::Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
-{
-	nd::TiXmlElement* const childNode = new nd::TiXmlElement(ClassName());
-	desc.m_rootNode->LinkEndChild(childNode);
-	childNode->SetAttribute("hashId", desc.m_nodeNodeHash);
-
-	xmlSaveParam(childNode, "inertia", m_inertia);
-	xmlSaveParam(childNode, "crossInertia", m_crossInertia);
-	xmlSaveParam(childNode, "centerOfMass", m_centerOfMass);
-	xmlSaveParam(childNode, "boxSize", m_boxSize);
-	xmlSaveParam(childNode, "boxOrigin", m_boxOrigin);
-}
-
 void ndShape::MassProperties()
 {
 	// using general central theorem, to extract the Inertia relative to the center of mass 
@@ -86,7 +73,7 @@ void ndShape::MassProperties()
 	ndVector origin(m_centerOfMass);
 	ndFloat32 originMag2 = origin.DotProduct(origin & ndVector::m_triplexMask).GetScalar();
 
-	ndMatrix Covariance(origin, origin);
+	ndMatrix Covariance(ndCovarianceMatrix(origin, origin));
 	ndMatrix parallel(ndGetIdentityMatrix());
 	for (ndInt32 i = 0; i < 3; ++i) 
 	{

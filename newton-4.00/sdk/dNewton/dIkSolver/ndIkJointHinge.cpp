@@ -13,23 +13,24 @@
 #include "ndNewtonStdafx.h"
 #include "ndIkJointHinge.h"
 
-D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndIkJointHinge)
+ndIkJointHinge::ndIkJointHinge()
+	:ndJointHinge()
+	,ndJointBilateralConstraint::ndIkInterface()
+	,m_maxTorque(D_IK_HINGE_MAX_TORQUE)
+{
+}
 
 ndIkJointHinge::ndIkJointHinge(const ndMatrix& pinAndPivotFrame, ndBodyKinematic* const child, ndBodyKinematic* const parent)
 	:ndJointHinge(pinAndPivotFrame, child, parent)
 	,ndJointBilateralConstraint::ndIkInterface()
+	,m_maxTorque (D_IK_HINGE_MAX_TORQUE)
 {
 }
 
 ndIkJointHinge::ndIkJointHinge(const ndMatrix& pinAndPivotInChild, const ndMatrix& pinAndPivotInParent, ndBodyKinematic* const child, ndBodyKinematic* const parent)
 	:ndJointHinge(pinAndPivotInChild, pinAndPivotInParent, child, parent)
 	,ndJointBilateralConstraint::ndIkInterface()
-{
-}
-
-ndIkJointHinge::ndIkJointHinge(const ndLoadSaveBase::ndLoadDescriptor& desc)
-	:ndJointHinge(ndLoadSaveBase::ndLoadDescriptor(desc))
-	,ndJointBilateralConstraint::ndIkInterface()
+	,m_maxTorque(D_IK_HINGE_MAX_TORQUE)
 {
 }
 
@@ -37,12 +38,14 @@ ndIkJointHinge::~ndIkJointHinge()
 {
 }
 
-void ndIkJointHinge::Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
+ndFloat32 ndIkJointHinge::GetMaxTorque() const
 {
-	nd::TiXmlElement* const childNode = new nd::TiXmlElement(ClassName());
-	desc.m_rootNode->LinkEndChild(childNode);
-	childNode->SetAttribute("hashId", desc.m_nodeNodeHash);
-	ndJointHinge::Save(ndLoadSaveBase::ndSaveDescriptor(desc, childNode));
+	return m_maxTorque;
+}
+
+void ndIkJointHinge::SetMaxTorque(ndFloat32 maxTorque)
+{
+	m_maxTorque = ndAbs(maxTorque);
 }
 
 void ndIkJointHinge::JacobianDerivative(ndConstraintDescritor& desc)
@@ -59,6 +62,11 @@ void ndIkJointHinge::JacobianDerivative(ndConstraintDescritor& desc)
 		AddAngularRowJacobian(desc, pin, 0.0f);
 		SetMotorAcceleration(desc, accel);
 		SetDiagonalRegularizer(desc, m_defualRegularizer);
+		if (m_maxTorque < D_IK_HINGE_MAX_TORQUE)
+		{
+			SetHighFriction(desc, m_maxTorque);
+			SetLowerFriction(desc, -m_maxTorque);
+		}
 	}
 	SubmitLimits(desc, matrix0, matrix1);
 }

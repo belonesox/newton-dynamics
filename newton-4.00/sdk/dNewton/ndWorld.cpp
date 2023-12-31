@@ -27,22 +27,24 @@
 #include "ndBodyDynamic.h"
 #include "ndSkeletonList.h"
 #include "ndDynamicsUpdate.h"
-#include "ndBodyParticleSet.h"
 #include "ndDynamicsUpdateSoa.h"
 #include "ndJointBilateralConstraint.h"
 
 #ifdef _D_USE_AVX2_SOLVER
+	#include "ndWorldSceneAvx2.h"
 	#include "ndDynamicsUpdateAvx2.h"
-#endif
-
-#ifdef _D_NEWTON_OPENCL
-	#include "ndDynamicsUpdateOpencl.h"
 #endif
 
 #ifdef _D_NEWTON_CUDA
 	#include "ndCudaUtils.h"
 	#include "ndWorldSceneCuda.h"
 	#include "ndDynamicsUpdateCuda.h"
+#endif
+
+#ifdef _D_NEWTON_SYCL
+	#include "ndSyclContext.h"
+	#include "ndWorldSceneSycl.h"
+	#include "ndDynamicsUpdateSycl.h"
 #endif
 
 class ndSkeletonQueue : public ndFixSizeArray<ndSkeletonContainer::ndNode*, 1024 * 4>
@@ -103,10 +105,9 @@ ndWorld::ndWorld()
 	,m_jointList()
 	,m_modelList()
 	,m_skeletonList()
-	,m_particleSetList()
-	,m_deletedBodies(256)
-	,m_deletedModels(256)
-	,m_deletedJoints(256)
+	,m_deletedBodies()
+	,m_deletedModels()
+	,m_deletedJoints()
 	,m_activeSkeletons(256)
 	,m_deletedLock()
 	,m_timestep(ndFloat32 (0.0f))
@@ -116,8 +117,6 @@ ndWorld::ndWorld()
 	,m_averageTimestepAcc(ndFloat32(0.0f))
 	,m_averageFramesCount(ndFloat32(0.0f))
 	,m_lastExecutionTime(ndFloat32(0.0f))
-	,m_extensionAverageUpdateTime(ndFloat32(0.0f))
-	,m_extensionAverageTimestepAcc(ndFloat32(0.0f))
 	,m_subSteps(1)
 	,m_solverMode(ndStandardSolver)
 	,m_solverIterations(4)
@@ -171,6 +170,7 @@ void ndWorld::CleanUp()
 {
 	Sync();
 	m_scene->m_backgroundThread.Terminate();
+	m_scene->PrepareCleanup();
 
 	m_activeSkeletons.Resize(256);
 	while (m_skeletonList.GetFirst())
@@ -187,13 +187,12 @@ void ndWorld::CleanUp()
 	while (m_modelList.GetFirst())
 	{
 		ndSharedPtr<ndModel>& model = m_modelList.GetFirst()->GetInfo();
-		RemoveModel(model);
+		m_modelList.RemoveModel(model);
 	}
 
-	while (m_particleSetList.GetFirst())
+	while (m_scene->m_particleSetList.GetFirst())
 	{
-		//ndBodyParticleSet* const body = m_particleSetList.GetFirst()->GetInfo()->GetAsBodyParticleSet();
-		ndSharedPtr<ndBody>& body = m_particleSetList.GetFirst()->GetInfo();
+		ndSharedPtr<ndBody>& body = m_scene->m_particleSetList.GetFirst()->GetInfo();
 		RemoveBody(body);
 	}
 
@@ -212,9 +211,9 @@ const char* ndWorld::GetSolverString() const
 	return m_solver->GetStringId();
 }
 
-bool ndWorld::IsGPU() const
+bool ndWorld::IsHighPerformanceCompute() const
 {
-	return m_scene->IsGPU();
+	return m_scene->IsHighPerformanceCompute();
 }
 
 void ndWorld::ClearCache()
@@ -300,7 +299,7 @@ const ndSkeletonList& ndWorld::GetSkeletonList() const
 
 const ndBodyList& ndWorld::GetParticleList() const
 {
-	return m_particleSetList;
+	return m_scene->m_particleSetList;
 }
 
 const ndModelList& ndWorld::GetModelList() const
@@ -318,11 +317,6 @@ ndFloat32 ndWorld::GetAverageUpdateTime() const
 	return m_averageUpdateTime;
 }
 
-ndFloat32 ndWorld::GetExtensionAverageUpdateTime() const
-{
-	return m_extensionAverageUpdateTime;
-}
-
 ndUnsigned32 ndWorld::GetFrameNumber() const
 {
 	return m_scene->m_frameNumber;
@@ -333,15 +327,10 @@ ndUnsigned32 ndWorld::GetSubFrameNumber() const
 	return m_scene->m_subStepNumber;
 }
 
-void ndWorld::OnPostUpdate(ndFloat32)
-{
-}
-
 void ndWorld::DebugScene(ndSceneTreeNotiFy* const notify)
 {
 	m_scene->DebugScene(notify);
 }
-
 
 ndWorld::ndSolverModes ndWorld::GetSelectedSolver() const
 {
@@ -360,49 +349,34 @@ void ndWorld::SendBackgroundTask(ndBackgroundTask* const job)
 
 void ndWorld::UpdateTransforms()
 {
-	for (ndBodyList::ndNode* node = m_particleSetList.GetFirst(); node; node = node->GetNext())
-	{
-		ndBodyParticleSet* const particleSet = node->GetInfo()->GetAsBodyParticleSet();
-		ndAssert(particleSet);
-		ndBodyNotify* const notify = particleSet->GetNotifyCallback();
-		if (notify)
-		{
-			notify->OnTransform(0, particleSet->GetMatrix());
-		}
-	}
-
 	m_scene->UpdateTransform();
+}
+
+void ndWorld::PreUpdate(ndFloat32)
+{
 }
 
 void ndWorld::PostUpdate(ndFloat32)
 {
-	D_TRACKTIME();
-	OnPostUpdate(m_timestep);
 }
 
-bool ndWorld::AddBody(ndSharedPtr<ndBody>& body)
+bool ndWorld::AddBody(const ndSharedPtr<ndBody>& body)
 {
-	ndBodyKinematic* const kinematicBody = body->GetAsBodyKinematic();
-	ndAssert(kinematicBody != GetSentinelBody());
-	if (kinematicBody)
-	{
-		return m_scene->AddBody(body);
-	}
-	else if (body->GetAsBodyParticleSet())
-	{
-		ndBodyParticleSet* const particleSet = body->GetAsBodyParticleSet();
-		ndAssert(particleSet->m_listNode == nullptr);
-		ndBodyList::ndNode* const node = m_particleSetList.Append(body);
-		particleSet->m_listNode = node;
-	}
-	return false;
+	ndAssert(GetSentinelBody() != body->GetAsBodyKinematic());
+	return m_scene->AddBody(body);
 }
 
-void ndWorld::AddJoint(ndSharedPtr<ndJointBilateralConstraint>& joint)
+ndSharedPtr<ndBody> ndWorld::GetBody(ndBody* const body) const
+{
+	return m_scene->GetBody(body);
+}
+
+void ndWorld::AddJoint(const ndSharedPtr<ndJointBilateralConstraint>& joint)
 {
 	// if the second body is nullPtr, replace it the sentinel
 	ndAssert(joint->m_body0);
 	ndAssert(joint->m_body1);
+	ndAssert(joint->IsActive());
 	if (joint->m_worldNode == nullptr)
 	{
 		ndAssert(joint->m_body0Node == nullptr);
@@ -412,12 +386,12 @@ void ndWorld::AddJoint(ndSharedPtr<ndJointBilateralConstraint>& joint)
 			m_skeletonList.m_skelListIsDirty = true;
 		}
 		joint->m_worldNode = m_jointList.Append(joint);
-		joint->m_body0Node = joint->GetBody0()->AttachJoint(*joint);
-		joint->m_body1Node = joint->GetBody1()->AttachJoint(*joint);
+		joint->m_body0Node = joint->GetBody0()->AttachJoint((ndJointBilateralConstraint*)*joint);
+		joint->m_body1Node = joint->GetBody1()->AttachJoint((ndJointBilateralConstraint*)*joint);
 	}
 }
 
-void ndWorld::AddModel(ndSharedPtr<ndModel>& model)
+void ndWorld::AddModel(const ndSharedPtr<ndModel>& model)
 {
 	m_modelList.AddModel(model, this);
 }
@@ -455,10 +429,60 @@ void ndWorld::ThreadFunction()
 {
 	D_TRACKTIME();
 	ndUnsigned64 timeAcc = ndGetTimeInMicroseconds();
+
+	// clean up all batched deletd objects, before update
+	while (m_deletedModels.GetCount())
+	{
+		ndAssert(0);
+		ndModel* const model = m_deletedModels.GetFirst()->GetInfo();
+		m_deletedModels.Remove(m_deletedModels.GetFirst());
+		model->m_deletedNode = nullptr;
+
+		ndModelList::ndNode* const worldNode = model->m_worldNode;
+		m_modelList.RemoveModel(worldNode->GetInfo());
+	}
+
+	// remove joints bodies dependencies first
+	for (ndSpecialList<ndBody>::ndNode* node = m_deletedBodies.GetFirst(); node; node = node->GetNext())
+	{
+		ndBodyKinematic* const kinematicBody = node->GetInfo()->GetAsBodyKinematic();
+		//ndTrace(("body: %s %d\n", kinematicBody->ClassName(), kinematicBody->m_uniqueId));
+		ndAssert(kinematicBody != GetSentinelBody());
+		for (ndBodyKinematic::ndJointList::ndNode* jointNode = kinematicBody->GetJointList().GetFirst(); jointNode; jointNode = jointNode->GetNext())
+		{
+			ndJointBilateralConstraint* const joint = jointNode->GetInfo();
+			RemoveJoint(joint);
+		}
+	}
+
+	while (m_deletedJoints.GetCount())
+	{
+		ndJointBilateralConstraint* const joint = m_deletedJoints.GetFirst()->GetInfo();
+		m_deletedJoints.Remove(m_deletedJoints.GetFirst());
+
+		ndJointList::ndNode* const worldNode = joint->m_worldNode;
+		if (worldNode != nullptr)
+		{
+			RemoveJoint(worldNode->GetInfo());
+		}
+	}
+
+	while (m_deletedBodies.GetCount())
+	{
+		ndBody* const body = m_deletedBodies.GetFirst()->GetInfo();
+		m_deletedBodies.Remove(m_deletedBodies.GetFirst());
+
+		body->m_deletedNode = nullptr;
+		ndSharedPtr<ndBody> sharedBody(GetBody(body));
+		RemoveBody(sharedBody);
+	}
+
 	m_inUpdate = true;
 	m_scene->Begin();
 
 	m_scene->SetTimestep(m_timestep);
+
+	PreUpdate(m_timestep);
 
 	ndInt32 const steps = m_subSteps;
 	ndFloat32 timestep = m_timestep / (ndFloat32)steps;
@@ -474,26 +498,8 @@ void ndWorld::ThreadFunction()
 	UpdateTransforms();
 	PostModelTransform();
 	PostUpdate(m_timestep);
-
 	m_inUpdate = false;
 
-	for (ndInt32 i = 0; i < m_deletedModels.GetCount(); i++)
-	{
-		RemoveModel(m_deletedModels[i]);
-	}
-	m_deletedModels.SetCount(0);
-
-	for (ndInt32 i = 0; i < m_deletedJoints.GetCount(); i++)
-	{
-		RemoveJoint(m_deletedJoints[i]);
-	}
-	m_deletedJoints.SetCount(0);
-
-	for (ndInt32 i = 0; i < m_deletedBodies.GetCount(); i++)
-	{
-		RemoveBody(m_deletedBodies[i]);
-	}
-	m_deletedBodies.SetCount(0);
 	m_scene->End();
 	
 	m_lastExecutionTime = (ndFloat32)(ndGetTimeInMicroseconds() - timeAcc) * ndFloat32(1.0e-6f);
@@ -504,7 +510,6 @@ void ndWorld::CalculateAverageUpdateTime()
 {
 	m_averageFramesCount += ndFloat32 (1.0f);
 	m_averageTimestepAcc += m_lastExecutionTime;
-	m_extensionAverageTimestepAcc += ndFloat32(m_scene->GetGPUTime());
 
 	ndAssert(m_averageTimestepAcc >= ndFloat32(0.0f));
 	const ndFloat32 movingAverageFrames = ndFloat32 (16);
@@ -512,9 +517,6 @@ void ndWorld::CalculateAverageUpdateTime()
 	{
 		m_averageUpdateTime = m_averageTimestepAcc/m_averageFramesCount;
 		m_averageTimestepAcc = ndFloat32 (0.0f);
-
-		m_extensionAverageUpdateTime = m_extensionAverageTimestepAcc / m_averageFramesCount;
-		m_extensionAverageTimestepAcc = 0.0f;
 
 		m_averageFramesCount -= movingAverageFrames;
 	}
@@ -544,7 +546,7 @@ void ndWorld::SubStepUpdate(ndFloat32 timestep)
 	// Update Particle base physics
 	//ParticleUpdate();
 
-	// u[pate skeleton topologies
+	// update skeletons topologies
 	UpdateSkeletons();
 
 	// Update all models
@@ -563,11 +565,7 @@ void ndWorld::SubStepUpdate(ndFloat32 timestep)
 void ndWorld::ParticleUpdate(ndFloat32 timestep)
 {
 	D_TRACKTIME();
-	for (ndBodyList::ndNode* node = m_particleSetList.GetFirst(); node; node = node->GetNext())
-	{
-		ndBodyParticleSet* const body = node->GetInfo()->GetAsBodyParticleSet();
-		body->Update(this, timestep);
-	}
+	m_scene->ParticleUpdate(timestep);
 }
 
 void ndWorld::ModelUpdate()
@@ -945,7 +943,7 @@ void ndWorld::SelectSolver(ndSolverModes solverMode)
 			case ndSimdAvx2Solver:
 			{
 				#ifdef _D_USE_AVX2_SOLVER
-					ndWorldScene* const newScene = new ndWorldScene(*((ndWorldScene*)m_scene));
+					ndWorldScene* const newScene = new ndWorldSceneAvx2(*((ndWorldScene*)m_scene));
 					delete m_scene;
 					m_scene = newScene;
 
@@ -962,15 +960,29 @@ void ndWorld::SelectSolver(ndSolverModes solverMode)
 				break;
 			}
 
-			case ndOpenclSolver1:
+			case ndSyclSolverCpu:
 			{
-				#ifdef _D_NEWTON_OPENCL
-					ndWorldScene* const newScene = new ndWorldScene(this);
+				#ifdef _D_NEWTON_SYCL
+					ndMemFreeCallback freeMemory;
+					ndMemAllocCallback allocMemory;
+					ndMemory::GetMemoryAllocators(allocMemory, freeMemory);
+					ndSyclContext::SetMemoryAllocators(allocMemory, freeMemory);
+
+					ndWorldScene* const newScene = new ndWorldSceneSycl(*((ndWorldScene*)m_scene), true);
 					delete m_scene;
 					m_scene = newScene;
-
 					m_solverMode = solverMode;
-					m_solver = new ndDynamicsUpdateOpencl(this, 0);
+					m_solver = new ndDynamicsUpdateSycl(this);
+					if (!newScene->IsValid())
+					{
+						delete m_solver;
+						ndWorldScene* const defaultScene = new ndWorldScene(*((ndWorldScene*)m_scene));
+						delete m_scene;
+						m_scene = defaultScene;
+
+						m_solverMode = ndSimdSoaSolver;
+						m_solver = new ndDynamicsUpdateSoa(this);
+					}
 				#else
 					ndWorldScene* const newScene = new ndWorldScene(*((ndWorldScene*)m_scene));
 					delete m_scene;
@@ -982,15 +994,29 @@ void ndWorld::SelectSolver(ndSolverModes solverMode)
 				break;
 			}
 
-			case ndOpenclSolver2:
+			case ndSyclSolverGpu:
 			{
-				#ifdef _D_NEWTON_OPENCL
-					ndWorldScene* const newScene = new ndWorldScene(*((ndWorldScene*)m_scene));
+				#ifdef _D_NEWTON_SYCL
+					ndMemFreeCallback freeMemory;
+					ndMemAllocCallback allocMemory;
+					ndMemory::GetMemoryAllocators(allocMemory, freeMemory);
+					ndSyclContext::SetMemoryAllocators(allocMemory, freeMemory);
+
+					ndWorldScene* const newScene = new ndWorldSceneSycl(*((ndWorldScene*)m_scene), false);
 					delete m_scene;
 					m_scene = newScene;
-
 					m_solverMode = solverMode;
-					m_solver = new ndDynamicsUpdateOpencl(this, 1);
+					m_solver = new ndDynamicsUpdateSycl(this);
+					if (!newScene->IsValid())
+					{
+						delete m_solver;
+						ndWorldScene* const defaultScene = new ndWorldScene(*((ndWorldScene*)m_scene));
+						delete m_scene;
+						m_scene = defaultScene;
+
+						m_solverMode = ndSimdSoaSolver;
+						m_solver = new ndDynamicsUpdateSoa(this);
+					}
 				#else
 					ndWorldScene* const newScene = new ndWorldScene(*((ndWorldScene*)m_scene));
 					delete m_scene;
@@ -999,17 +1025,16 @@ void ndWorld::SelectSolver(ndSolverModes solverMode)
 					m_solverMode = ndSimdSoaSolver;
 					m_solver = new ndDynamicsUpdateSoa(this);
 				#endif
-
 				break;
 			}
-			
+
 			case ndCudaSolver:
 			{
 				#ifdef _D_NEWTON_CUDA
 					ndMemFreeCallback freeMemory;
 					ndMemAllocCallback allocMemory;
-					ndMemory::GetMemoryAllocators(allocMemory,freeMemory);
-					CudaSetMemoryAllocators(allocMemory, freeMemory);
+					ndMemory::GetMemoryAllocators(allocMemory, freeMemory);
+					ndCudaContext::SetMemoryAllocators(allocMemory, freeMemory);
 					ndWorldScene* const newScene = new ndWorldSceneCuda(*((ndWorldScene*)m_scene));
 					delete m_scene;
 					m_scene = newScene;
@@ -1022,14 +1047,13 @@ void ndWorld::SelectSolver(ndSolverModes solverMode)
 						delete m_scene;
 						m_scene = defaultScene;
 
-						m_solverMode = ndStandardSolver;
-						m_solver = new ndDynamicsUpdate(this);
+						m_solverMode = ndSimdSoaSolver;
+						m_solver = new ndDynamicsUpdateSoa(this);
 					}
 				#else
 					ndWorldScene* const newScene = new ndWorldScene(*((ndWorldScene*)m_scene));
 					delete m_scene;
 					m_scene = newScene;
-
 					m_solverMode = ndSimdSoaSolver;
 					m_solver = new ndDynamicsUpdateSoa(this);
 				#endif
@@ -1083,123 +1107,79 @@ void ndWorld::Update(ndFloat32 timestep)
 
 void ndWorld::RemoveBody(ndSharedPtr<ndBody>& body)
 {
-	ndBodyKinematic* const kinematicBody = body->GetAsBodyKinematic();
-	if (m_inUpdate)
+	m_scene->RemoveBody(body);
+}
+
+void ndWorld::RemoveJoint(ndSharedPtr<ndJointBilateralConstraint>& joint)
+{
+	ndJointList::ndNode* const worldNode = joint->m_worldNode;
+	if (worldNode != nullptr)
 	{
-		ndScopeSpinLock lock(m_deletedLock);
-		if (!body->m_markedForRemoved)
+		//ndTrace(("  joint %s %d %d\n", joint->ClassName(), joint->GetBody0()->m_uniqueId, joint->GetBody1()->m_uniqueId));
+		ndAssert(joint->m_body0Node != nullptr);
+		ndAssert(joint->m_body1Node != nullptr);
+		joint->GetBody0()->DetachJoint(joint->m_body0Node);
+		joint->GetBody1()->DetachJoint(joint->m_body1Node);
+
+		if (joint->IsSkeleton())
 		{
-			body->m_markedForRemoved = 1;
-			m_deletedBodies.PushBack(*body);
-		}
-	}
-	else
-	{
-		if (kinematicBody && kinematicBody->m_scene)
-		{
-			ndAssert(kinematicBody != GetSentinelBody());
-			const ndBodyKinematic::ndJointList& jointList = kinematicBody->GetJointList();
-			while (jointList.GetFirst())
+			m_skeletonList.m_skelListIsDirty = true;
+			ndSkeletonContainer* const skeleton = joint->GetBody0()->GetSkeleton();
+			if (skeleton)
 			{
-				ndJointBilateralConstraint* const joint = jointList.GetFirst()->GetInfo();
-				ndAssert(joint->m_worldNode);
-				RemoveJoint(joint->m_worldNode->GetInfo());
+				skeleton->Clear();
 			}
-			m_scene->RemoveBody(kinematicBody);
 		}
-		else if (body->GetAsBodyParticleSet())
-		{
-			ndBodyParticleSet* const particleSet = body->GetAsBodyParticleSet();
-			ndAssert(particleSet->m_listNode);
-			m_particleSetList.Remove(particleSet->m_listNode);
-		}
+
+		joint->SetActive(true);
+		joint->m_worldNode = nullptr;
+		joint->m_body0Node = nullptr;
+		joint->m_body1Node = nullptr;
+		joint->m_deletedNode = nullptr;
+		m_jointList.Remove(worldNode);
 	}
 }
 
 void ndWorld::RemoveBody(ndBody* const body)
 {
-	ndBodyKinematic* const kinematicBody = body->GetAsBodyKinematic();
-	if (kinematicBody->m_scene)
+	ndScopeSpinLock lock(m_deletedLock);
+	if (!body->m_deletedNode)
 	{
-		ndAssert(kinematicBody->m_sceneNode);
-		RemoveBody(kinematicBody->m_sceneNode->GetInfo());
-	}
-	else
-	{
-		ndAssert(0);
-	}
-}
-
-void ndWorld::RemoveJoint(ndSharedPtr<ndJointBilateralConstraint>& joint)
-{
-	if (m_inUpdate)
-	{
-		ndScopeSpinLock lock(m_deletedLock);
-		if (!joint->m_markedForRemoved)
-		{
-			joint->m_markedForRemoved = 1;
-			m_deletedJoints.PushBack(*joint);
-		}
-	}
-	else
-	{
-		ndJointList::ndNode* const worldNode = joint->m_worldNode;
-		if (worldNode != nullptr)
-		{
-			ndAssert(joint->m_body0Node != nullptr);
-			ndAssert(joint->m_body1Node != nullptr);
-			joint->GetBody0()->DetachJoint(joint->m_body0Node);
-			joint->GetBody1()->DetachJoint(joint->m_body1Node);
-
-			if (joint->IsSkeleton())
-			{
-				m_skeletonList.m_skelListIsDirty = true;
-				ndSkeletonContainer* const skeleton = joint->GetBody0()->GetSkeleton();
-				if (skeleton)
-				{
-					skeleton->Clear();
-				}
-			}
-			joint->m_worldNode = nullptr;
-			joint->m_body0Node = nullptr;
-			joint->m_body1Node = nullptr;
-			m_jointList.Remove(worldNode);
-		}
+		body->m_deletedNode = m_deletedBodies.Append(body);
 	}
 }
 
 void ndWorld::RemoveJoint(ndJointBilateralConstraint* const joint)
 {
-	ndJointList::ndNode* const worldNode = joint->m_worldNode;
-	if (worldNode)
+	ndScopeSpinLock lock(m_deletedLock);
+	if (!joint->m_deletedNode)
 	{
-		ndSharedPtr<ndJointBilateralConstraint>& jointPtr = worldNode->GetInfo();
-		RemoveJoint(jointPtr);
-	}
-}
-
-void ndWorld::RemoveModel(ndSharedPtr<ndModel>& model)
-{
-	if (m_inUpdate)
-	{
-		ndScopeSpinLock lock(m_deletedLock);
-		if (!model->m_markedForRemoved)
+		if (joint->m_worldNode)
 		{
-			model->m_markedForRemoved = true;
-			m_deletedModels.PushBack(*model);
+			joint->SetActive(false);
+			joint->m_deletedNode = m_deletedJoints.Append(joint);
 		}
-	}
-	else
-	{
-		m_modelList.RemoveModel(model);
 	}
 }
 
 void ndWorld::RemoveModel(ndModel* const model)
 {
-	if (model->m_node)
+	ndScopeSpinLock lock(m_deletedLock);
+	if (!model->m_deletedNode)
 	{
-		ndSharedPtr<ndModel>& modelPtr = model->m_node->GetInfo();
-		RemoveModel(modelPtr);
+		if (model->m_worldNode)
+		{
+			model->m_deletedNode = m_deletedModels.Append(model);
+		}
 	}
+}
+
+void ndWorld::CalculateJointContacts(ndContact* const contact)
+{
+	ndBodyKinematic* const body0 = contact->GetBody0();
+	ndBodyKinematic* const body1 = contact->GetBody1();
+	body0->UpdateCollisionMatrix();
+	body1->UpdateCollisionMatrix();
+
+	m_scene->CalculateJointContacts(0, contact);
 }

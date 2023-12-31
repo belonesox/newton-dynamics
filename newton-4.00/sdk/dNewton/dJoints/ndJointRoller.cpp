@@ -19,7 +19,29 @@
 #define D_MAX_HINGE_RECOVERY_SPEED	ndFloat32 (0.25f)
 #define D_MAX_HINGE_PENETRATION		(ndFloat32 (4.0f) * ndDegreeToRad)
 
-D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndJointRoller)
+ndJointRoller::ndJointRoller()
+	:ndJointBilateralConstraint()
+	,m_angle(ndFloat32(0.0f))
+	,m_omega(ndFloat32(0.0f))
+	,m_springKAngle(ndFloat32(0.0f))
+	,m_damperCAngle(ndFloat32(0.0f))
+	,m_minLimitAngle(ndFloat32(-1.0e10f))
+	,m_maxLimitAngle(ndFloat32(1.0e10f))
+	,m_offsetAngle(ndFloat32(0.0f))
+	,m_springDamperRegularizerAngle(ndFloat32(0.1f))
+	,m_posit(ndFloat32(0.0f))
+	,m_speed(ndFloat32(0.0f))
+	,m_springKPosit(ndFloat32(0.0f))
+	,m_damperCPosit(ndFloat32(0.0f))
+	,m_minLimitPosit(ndFloat32(-1.0e10f))
+	,m_maxLimitPosit(ndFloat32(1.0e10f))
+	,m_offsetPosit(ndFloat32(0.0f))
+	,m_springDamperRegularizerPosit(ndFloat32(0.1f))
+	,m_limitStatePosit(0)
+	,m_limitStateAngle(0)
+{
+	m_maxDof = 8;
+}
 
 ndJointRoller::ndJointRoller(const ndMatrix& pinAndPivotFrame, ndBodyKinematic* const child, ndBodyKinematic* const parent)
 	:ndJointBilateralConstraint(8, child, parent, pinAndPivotFrame)
@@ -70,82 +92,8 @@ ndJointRoller::ndJointRoller(const ndMatrix& pinAndPivotInChild, const ndMatrix&
 	CalculateLocalMatrix(pinAndPivotInParent, tmp, m_localMatrix1);
 }
 
-ndJointRoller::ndJointRoller(const ndLoadSaveBase::ndLoadDescriptor& desc)
-	:ndJointBilateralConstraint(ndLoadSaveBase::ndLoadDescriptor(desc))
-	,m_angle(ndFloat32(0.0f))
-	,m_omega(ndFloat32(0.0f))
-	,m_springKAngle(ndFloat32(0.0f))
-	,m_damperCAngle(ndFloat32(0.0f))
-	,m_minLimitAngle(ndFloat32(-1.0e10f))
-	,m_maxLimitAngle(ndFloat32(1.0e10f))
-	,m_offsetAngle(ndFloat32(0.0f))
-	,m_springDamperRegularizerAngle(ndFloat32(0.1f))
-	,m_posit(ndFloat32(0.0f))
-	,m_speed(ndFloat32(0.0f))
-	,m_springKPosit(ndFloat32(0.0f))
-	,m_damperCPosit(ndFloat32(0.0f))
-	,m_minLimitPosit(ndFloat32(-1.0e10f))
-	,m_maxLimitPosit(ndFloat32(1.0e10f))
-	,m_offsetPosit(ndFloat32(0.0f))
-	,m_springDamperRegularizerPosit(ndFloat32(0.1f))
-	,m_limitStatePosit(0)
-	,m_limitStateAngle(0)
-{
-	const nd::TiXmlNode* const xmlNode = desc.m_rootNode;
-
-	m_angle = xmlGetFloat(xmlNode, "angle");
-	m_omega = xmlGetFloat(xmlNode, "omega");
-	m_springKAngle = xmlGetFloat(xmlNode, "springKAngle");
-	m_damperCAngle = xmlGetFloat(xmlNode, "damperCAngle");
-	m_minLimitAngle = xmlGetFloat(xmlNode, "minLimitAngle");
-	m_maxLimitAngle = xmlGetFloat(xmlNode, "maxLimitAngle");
-	m_offsetAngle = xmlGetFloat(xmlNode, "offsetAngle");
-	m_springDamperRegularizerAngle = xmlGetFloat(xmlNode, "springDamperRegularizerAngle");
-
-	m_posit = xmlGetFloat(xmlNode, "posit");
-	m_speed = xmlGetFloat(xmlNode, "speed");
-	m_springKPosit = xmlGetFloat(xmlNode, "springKPosit");
-	m_damperCPosit = xmlGetFloat(xmlNode, "damperCPosit");
-	m_minLimitPosit = xmlGetFloat(xmlNode, "minLimitPosit");
-	m_maxLimitPosit = xmlGetFloat(xmlNode, "maxLimitPosit");
-	m_offsetPosit = xmlGetFloat(xmlNode, "offsetPosit");
-	m_springDamperRegularizerPosit = xmlGetFloat(xmlNode, "springDamperRegularizerPosit");
-
-	m_limitStatePosit = ndInt8(xmlGetInt(xmlNode, "limitStatePosit"));
-	m_limitStateAngle = ndInt8 (xmlGetInt(xmlNode, "limitStateAngle"));
-}
-
 ndJointRoller::~ndJointRoller()
 {
-}
-
-void ndJointRoller::Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
-{
-	nd::TiXmlElement* const childNode = new nd::TiXmlElement(ClassName());
-	desc.m_rootNode->LinkEndChild(childNode);
-	childNode->SetAttribute("hashId", desc.m_nodeNodeHash);
-	ndJointBilateralConstraint::Save(ndLoadSaveBase::ndSaveDescriptor(desc, childNode));
-
-	xmlSaveParam(childNode, "angle", m_angle);
-	xmlSaveParam(childNode, "omega", m_omega);
-	xmlSaveParam(childNode, "springKAngle", m_springKAngle);
-	xmlSaveParam(childNode, "damperCAngle", m_damperCAngle);
-	xmlSaveParam(childNode, "minLimitAngle", m_minLimitAngle);
-	xmlSaveParam(childNode, "maxLimitAngle", m_maxLimitAngle);
-	xmlSaveParam(childNode, "offsetAngle", m_offsetAngle);
-	xmlSaveParam(childNode, "springDamperRegularizerAngle", m_springDamperRegularizerAngle);
-
-	xmlSaveParam(childNode, "posit", m_posit);
-	xmlSaveParam(childNode, "speed", m_speed);
-	xmlSaveParam(childNode, "springKPosit", m_springKPosit);
-	xmlSaveParam(childNode, "damperCPosit", m_damperCPosit);
-	xmlSaveParam(childNode, "minLimitPosit", m_minLimitPosit);
-	xmlSaveParam(childNode, "maxLimitPosit", m_maxLimitPosit);
-	xmlSaveParam(childNode, "offsetPosit", m_offsetPosit);
-	xmlSaveParam(childNode, "springDamperRegularizerPosit", m_springDamperRegularizerPosit);
-
-	xmlSaveParam(childNode, "limitStatePosit", m_limitStatePosit);
-	xmlSaveParam(childNode, "limitStateAngle", m_limitStateAngle);
 }
 
 ndFloat32 ndJointRoller::GetAngle() const
@@ -174,6 +122,17 @@ void ndJointRoller::SetLimitStateAngle(bool state)
 
 void ndJointRoller::SetLimitsAngle(ndFloat32 minLimit, ndFloat32 maxLimit)
 {
+#ifdef _DEBUG
+	if (minLimit > 0.0f)
+	{
+		ndTrace(("warning: %s minLimit %f larger than zero\n", __FUNCTION__, minLimit))
+	}
+	if (maxLimit < 0.0f)
+	{
+		ndTrace(("warning: %s m_maxLimit %f smaller than zero\n", __FUNCTION__, maxLimit))
+	}
+#endif
+
 	ndAssert(minLimit <= 0.0f);
 	ndAssert(maxLimit >= 0.0f);
 	m_minLimitAngle = minLimit;
@@ -181,13 +140,15 @@ void ndJointRoller::SetLimitsAngle(ndFloat32 minLimit, ndFloat32 maxLimit)
 
 	if (m_angle > m_maxLimitAngle)
 	{
-		const ndFloat32 deltaAngle = ndAnglesAdd(m_angle, -m_maxLimitAngle);
-		m_angle = m_maxLimitAngle + deltaAngle;
+		//const ndFloat32 deltaAngle = ndAnglesAdd(m_angle, -m_maxLimitAngle);
+		//m_angle = m_maxLimitAngle + deltaAngle;
+		m_angle = m_maxLimitAngle;
 	} 
 	else if (m_angle < m_minLimitAngle)
 	{
-		const ndFloat32 deltaAngle = ndAnglesAdd(m_angle, -m_minLimitAngle);
-		m_angle = m_minLimitAngle + deltaAngle;
+		//const ndFloat32 deltaAngle = ndAnglesAdd(m_angle, -m_minLimitAngle);
+		//m_angle = m_minLimitAngle + deltaAngle;
+		m_angle = m_minLimitAngle;
 	}
 }
 
@@ -244,14 +205,37 @@ bool ndJointRoller::GetLimitStatePosit() const
 void ndJointRoller::SetLimitStatePosit(bool state)
 {
 	m_limitStatePosit = state ? 1 : 0;
+	if (m_limitStatePosit)
+	{
+		SetLimitsPosit(m_minLimitPosit, m_maxLimitPosit);
+	}
 }
 
 void ndJointRoller::SetLimitsPosit(ndFloat32 minLimit, ndFloat32 maxLimit)
 {
 	ndAssert(minLimit <= 0.0f);
 	ndAssert(maxLimit >= 0.0f);
+#ifdef _DEBUG
+	if (minLimit > 0.0f)
+	{
+		ndTrace(("warning: %s minLimit %f larger than zero\n", __FUNCTION__, minLimit))
+	}
+	if (maxLimit < 0.0f)
+	{
+		ndTrace(("warning: %s m_maxLimit %f smaller than zero\n", __FUNCTION__, maxLimit))
+	}
+#endif
+
 	m_minLimitPosit = minLimit;
 	m_maxLimitPosit = maxLimit;
+	if (m_posit > m_maxLimitPosit)
+	{
+		m_posit = m_maxLimitPosit;
+	}
+	else if (m_posit < m_minLimitPosit)
+	{
+		m_posit = m_minLimitPosit;
+	}
 }
 
 void ndJointRoller::GetLimitsPosit(ndFloat32& minLimit, ndFloat32& maxLimit) const
@@ -418,15 +402,15 @@ void ndJointRoller::SubmitLimitsPosit(ndConstraintDescritor& desc, const ndMatri
 	{
 		if ((m_minLimitPosit == ndFloat32(0.0f)) && (m_maxLimitPosit == ndFloat32(0.0f)))
 		{
-			AddLinearRowJacobian(desc, matrix0.m_posit, matrix1.m_posit, matrix1.m_front);
+			AddLinearRowJacobian(desc, matrix0.m_posit, matrix1.m_posit, matrix1.m_up);
 		}
 		else
 		{
 			ndFloat32 x = m_posit + m_speed * desc.m_timestep;
 			if (x < m_minLimitPosit)
 			{
-				ndVector p1(matrix1.m_posit + matrix1.m_front.Scale(m_minLimitPosit));
-				AddLinearRowJacobian(desc, matrix0.m_posit, p1, matrix1.m_front);
+				const ndVector p1(matrix1.m_posit + matrix1.m_up.Scale(m_minLimitPosit));
+				AddLinearRowJacobian(desc, matrix0.m_posit, p1, matrix1.m_up);
 				const ndFloat32 stopAccel = GetMotorZeroAcceleration(desc);
 				const ndFloat32 penetration = x - m_minLimitPosit;
 				const ndFloat32 recoveringAceel = -desc.m_invTimestep * PenetrationSpeed(-penetration);
@@ -435,7 +419,7 @@ void ndJointRoller::SubmitLimitsPosit(ndConstraintDescritor& desc, const ndMatri
 			}
 			else if (x > m_maxLimitPosit)
 			{
-				AddLinearRowJacobian(desc, matrix0.m_posit, matrix0.m_posit, matrix1.m_front);
+				AddLinearRowJacobian(desc, matrix0.m_posit, matrix0.m_posit, matrix1.m_up);
 				const ndFloat32 stopAccel = GetMotorZeroAcceleration(desc);
 				const ndFloat32 penetration = x - m_maxLimitPosit;
 				const ndFloat32 recoveringAceel = desc.m_invTimestep * PenetrationSpeed(penetration);

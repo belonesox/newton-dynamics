@@ -18,10 +18,13 @@ if (NEWTON_BUILD_PROFILER)
 	add_subdirectory(dProfiler)
 endif()
 
+add_subdirectory(dModel)
+add_subdirectory(dBrain)
+add_subdirectory(dFileFormat)
+
 if (NEWTON_BUILD_CREATE_SUB_PROJECTS)
 	add_subdirectory(dCore)
 	add_subdirectory(dNewton)
-	add_subdirectory(dTinyxml)
 	add_subdirectory(dCollision)
 else()
 	set (projectName "ndNewton")
@@ -29,33 +32,25 @@ else()
 
 	include_directories(dCore)
 	include_directories(dNewton)
-	include_directories(dTinyxml)
 	include_directories(dCollision)
 	include_directories(dNewton/dJoints)
 	include_directories(dNewton/dModels)
 	include_directories(dNewton/dIkSolver)
-	include_directories(dNewton/dParticles)
 	include_directories(dNewton/dModels/dVehicle)
-	include_directories(dNewton/dModels/dCharacter)
 
 	add_subdirectory(dNewton/dExtensions)
 
 	# source and header files
 	file(GLOB HEADERS 
-		dTinyxml/*.h 
 		dCore/*.h 
 		dNewton/*.h 
 		dCollision/*.h 
 		dNewton/dJoints/*.h 
 		dNewton/dModels/*.h 
 		dNewton/dIkSolver/*.h
-		dNewton/dParticles/*.h 
-		dNewton/dModels/dVehicle/*.h
-		dNewton/dModels/dCharacter/*.h)
+		dNewton/dModels/dVehicle/*.h)
 
 	file(GLOB CPP_SOURCE 
-		dTinyxml/*.h
-		dTinyxml/*.cpp
 		dCore/*.h 
 		dCore/*.cpp
 		dNewton/*.h 
@@ -68,12 +63,8 @@ else()
 		dNewton/dJoints/*.cpp
 		dNewton/dIkSolver/*.h
 		dNewton/dIkSolver/*.cpp
-		dNewton/dParticles/*.h
-		dNewton/dParticles/*.cpp
 		dNewton/dModels/dVehicle/*.h 
-		dNewton/dModels/dVehicle/*.cpp
-		dNewton/dModels/dCharacter/*.h
-		dNewton/dModels/dCharacter/*.cpp)
+		dNewton/dModels/dVehicle/*.cpp)
 
 	if(NEWTON_ENABLE_AVX2_SOLVER)
 		add_definitions(-D_D_USE_AVX2_SOLVER)
@@ -92,18 +83,20 @@ else()
 			dNewton/dExtensions/dCuda/dContext/*.h) 
 	endif()
 
-	if (NEWTON_ENABLE_OPENCL_SOLVER)
-		add_definitions(-D_D_NEWTON_OPENCL)
-		include_directories(dNewton/dExtensions/dOpencl)
+	if (NEWTON_ENABLE_SYCL_SOLVER)
+		add_definitions(-D_D_NEWTON_SYCL)
+		include_directories(dNewton/dExtensions/dSycl)
+		include_directories(dNewton/dExtensions/dSycl/ndScene)
 
-		if(NEWTON_BUILD_SHARED_LIBS)
-			if (PTR_SIZE EQUAL 8)
-				link_libraries ("${CMAKE_CURRENT_SOURCE_DIR}/dNewton/dExtensions/dOpencl/CL/lib/x64/OpenCL.lib")
-			else()
-				link_libraries ("${CMAKE_CURRENT_SOURCE_DIR}/dNewton/dExtensions/dOpencl/CL/lib/x86/OpenCL.lib")
-			endif()
-		endif()
-	endif(NEWTON_ENABLE_OPENCL_SOLVER)
+		file(GLOB CPP_SOURCE 
+			${CPP_SOURCE} 
+			dNewton/dExtensions/dSycl/ndScene/*.h
+			dNewton/dExtensions/dSycl/ndScene/*.cpp) 
+	endif()
+
+	if(MSVC)
+		file(GLOB CPP_SOURCE ${CPP_SOURCE} dCore/ndTypes.natvis)
+	endif()
 
 	source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/" FILES ${CPP_SOURCE})
 
@@ -112,7 +105,6 @@ else()
 	if(NEWTON_BUILD_SHARED_LIBS)
 		add_definitions(-D_D_CORE_EXPORT_DLL)
 		add_definitions(-D_D_NEWTON_EXPORT_DLL)
-		add_definitions(-D_D_TINYXML_EXPORT_DLL)
 		add_definitions(-D_D_COLLISION_EXPORT_DLL)
 		add_library(${projectName} SHARED ${CPP_SOURCE})
 
@@ -124,8 +116,8 @@ else()
 			target_link_libraries (${projectName} ndSolverCuda)
 		endif()
 
-		if (NEWTON_ENABLE_OPENCL_SOLVER)
-			target_link_libraries (${projectName} ndSolverOpenCL)
+		if (NEWTON_ENABLE_SYCL_SOLVER)
+			target_link_libraries (${projectName} ndSolverSycl)
 		endif()
 
 		if(MSVC OR MINGW)
@@ -142,7 +134,7 @@ else()
 			set_source_files_properties(dCore/ndCoreStdAfx.cpp PROPERTIES COMPILE_FLAGS "/YcndCoreStdafx.h")
 		endif()
 
-		if (NEWTON_BUILD_TEST AND NEWTON_BUILD_SHARED_LIBS)
+		if (NEWTON_BUILD_SHARED_LIBS)
 			add_custom_command(
 				TARGET ${projectName} POST_BUILD
 				COMMAND ${CMAKE_COMMAND}

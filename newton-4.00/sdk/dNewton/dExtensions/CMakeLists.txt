@@ -11,15 +11,17 @@
 cmake_minimum_required(VERSION 3.9.0 FATAL_ERROR)
 
 if(NEWTON_ENABLE_AVX2_SOLVER)
+	message ("adding avx2 solver")
 	add_subdirectory(dAvx2)
 endif()
 
 if (NEWTON_ENABLE_CUDA_SOLVER)
+	message ("adding cuda solver")
 	add_subdirectory(dCuda)
-	#add_subdirectory(dCudaOld)
 endif()
 
-if (NEWTON_ENABLE_OPENCL_SOLVER)
-	add_subdirectory(dOpencl)
+if (NEWTON_ENABLE_SYCL_SOLVER)
+	message ("adding sycl solver")
+	add_subdirectory(dSycl)
 endif()
 

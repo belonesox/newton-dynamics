@@ -24,17 +24,24 @@
 #include "ndCudaContext.h"
 #include "ndCudaContextImplement.h"
 
+#define D_CUDA_MIN_COMPUTE_CAP	610
+
+void CudaSetMemoryAllocators(ndMemAllocCallback alloc, ndMemFreeCallback free);
+
 ndCudaContext::ndCudaContext()
-	:m_device(new ndCudaDevice)
+	:m_device (new ndCudaDevice)
 	,m_implement(nullptr)
 {
-	int campbility = m_device->m_prop.major * 100 + m_device->m_prop.minor;
+	int capability = m_device->m_prop.major * 100 + m_device->m_prop.minor * 10;
 	// go as far back as 5.2 Maxwell GeForce GTX 960 or better.
-	if (campbility >= 600)
-	//if ((cudaStatus == cudaSuccess) && (campbility >= 700))
+	// go as far back as 6.1 Pascal GeForce GTX 1050 or better.
+	if (capability >= D_CUDA_MIN_COMPUTE_CAP)
 	{
 		cudaError_t cudaStatus = cudaSetDevice(0);
-		m_implement = (cudaStatus == cudaSuccess) ? new ndCudaContextImplement(m_device) : nullptr;
+		if (cudaStatus == cudaSuccess)
+		{
+			m_implement = new ndCudaContextImplement(m_device);
+		}
 	}
 }
 
@@ -44,8 +51,22 @@ ndCudaContext::~ndCudaContext()
 	{
 		delete m_implement;
 	}
-
 	delete m_device;
+}
+
+void* ndCudaContext::operator new (size_t size)
+{
+	return ndCudaMalloc(size);
+}
+
+void ndCudaContext::operator delete (void* ptr)
+{
+	ndCudaFree(ptr);
+}
+
+void ndCudaContext::SetMemoryAllocators(ndMemAllocCallback alloc, ndMemFreeCallback free)
+{
+	CudaSetMemoryAllocators(alloc, free);
 }
 
 bool ndCudaContext::IsValid() const 
@@ -55,28 +76,16 @@ bool ndCudaContext::IsValid() const
 
 const char* ndCudaContext::GetStringId() const
 {
-	return IsValid() ? &m_device->m_prop.name[0] : "no cuda support";
+	ndAssert(m_implement);
+	return m_implement->GetStringId();
 }
 
-double ndCudaContext::GetGPUTime() const
-{
-	return IsValid() ? m_implement->GetTimeInSeconds() : 0.0;
-}
-
+#if 0
 ndCudaSpatialVector* ndCudaContext::GetTransformBuffer()
 {
 	return m_implement->GetTransformBuffer();
 }
 
-void ndCudaContext::Begin()
-{
-	m_implement->Begin();
-}
-
-void ndCudaContext::End()
-{
-	m_implement->End();
-}
 
 void ndCudaContext::ResizeBuffers(int size)
 {
@@ -111,4 +120,25 @@ void ndCudaContext::IntegrateUnconstrainedBodies(float timestep)
 void ndCudaContext::UpdateTransform()
 {
 	m_implement->UpdateTransform();
+}
+#endif
+
+void ndCudaContext::Begin()
+{
+	m_implement->Begin();
+}
+
+void ndCudaContext::End()
+{
+	m_implement->End();
+}
+
+void ndCudaContext::Cleanup()
+{
+	m_implement->Cleanup();
+}
+
+void ndCudaContext::PrepareCleanup()
+{
+	m_implement->PrepareCleanup();
 }

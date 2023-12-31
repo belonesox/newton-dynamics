@@ -39,17 +39,15 @@ ndContact::ndContact()
 	,m_rotationAcc()
 	,m_separatingVector(m_initialSeparatingVector)
 	,m_contacPointsList()
-	,m_body0(nullptr)
-	,m_body1(nullptr)
 	,m_material(nullptr)
 	,m_timeOfImpact(ndFloat32(1.0e10f))
 	,m_separationDistance(ndFloat32(0.0f))
-	,m_maxDOF(0)
 	,m_sceneLru(0)
 	,m_isDead(0)
+	,m_inTrigger(0)
 	,m_isAttached(0)
 	,m_isIntersetionTestOnly(0)
-	,m_skeletonIntraCollision(1)
+	//,m_skeletonIntraCollision(1)
 	,m_skeletonSelftCollision(1)
 {
 	m_active = 0;
@@ -89,7 +87,7 @@ void ndContact::DetachFromBodies()
 void ndContact::JacobianDerivative(ndConstraintDescritor& desc)
 {
 	ndInt32 frictionIndex = 0;
-	if (m_maxDOF) 
+	if (m_maxDof) 
 	{
 		ndInt32 i = 0;
 		frictionIndex = m_contacPointsList.GetCount();
@@ -143,6 +141,7 @@ void ndContact::JacobianContactDerivative(ndConstraintDescritor& desc, const ndC
 	ndFloat32 relSpeed = -(normalJacobian0.m_linear * veloc0 + normalJacobian0.m_angular * omega0 + normalJacobian1.m_linear * veloc1 + normalJacobian1.m_angular * omega1).AddHorizontal().GetScalar();
 	ndFloat32 penetration = ndClamp(contact.m_penetration - D_RESTING_CONTACT_PENETRATION, ndFloat32(0.0f), ndFloat32(0.5f));
 	desc.m_flags[normalIndex] = ndInt32(contact.m_material.m_flags & m_isSoftContact);
+	desc.m_jointSpeed[normalIndex] = ndFloat32 (0.0f);
 	desc.m_penetration[normalIndex] = penetration;
 	desc.m_restitution[normalIndex] = restitutionCoefficient;
 	desc.m_forceBounds[normalIndex].m_low = ndFloat32(0.0f);
@@ -186,6 +185,7 @@ void ndContact::JacobianContactDerivative(ndConstraintDescritor& desc, const ndC
 
 		desc.m_restitution[jacobIndex] = ndFloat32(0.0f);
 		desc.m_penetration[jacobIndex] = ndFloat32(0.0f);
+		desc.m_jointSpeed[normalIndex] = ndFloat32(0.0f);
 
 		desc.m_penetrationStiffness[jacobIndex] = ndFloat32(0.0f);
 		if (contact.m_material.m_flags & m_override0Accel)
@@ -231,6 +231,7 @@ void ndContact::JacobianContactDerivative(ndConstraintDescritor& desc, const ndC
 
 		desc.m_restitution[jacobIndex] = ndFloat32(0.0f);
 		desc.m_penetration[jacobIndex] = ndFloat32(0.0f);
+		desc.m_jointSpeed[normalIndex] = ndFloat32(0.0f);
 		desc.m_penetrationStiffness[jacobIndex] = ndFloat32(0.0f);
 		if (contact.m_material.m_flags & m_override1Accel)
 		{

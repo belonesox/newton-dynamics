@@ -1,7 +1,8 @@
 #ifndef ND_RAYCAST_MESH_H
 #define ND_RAYCAST_MESH_H
 
-#include <stdint.h>
+#include "vhacdDefines.h"
+
 namespace nd_
 {
 	namespace VHACD
@@ -30,7 +31,7 @@ namespace nd_
 
 			virtual void release(void) = 0;
 		protected:
-			virtual ~RaycastMesh(void) { };
+			virtual ~RaycastMesh(void) { }
 		};
 
 	} // end of VHACD namespace

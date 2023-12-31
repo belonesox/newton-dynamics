@@ -25,9 +25,12 @@ class ndSharedPtr
 	void Swap(ndSharedPtr& src);
 
 	T* operator->();
+	T* operator->() const;
 
 	T* operator* ();
 	const T* operator* () const;
+
+	operator bool() const;
 
 	private:
 	class ndRefCounter : public ndAtomic<ndInt32>, public ndContainersFreeListAlloc<ndRefCounter>
@@ -144,6 +147,18 @@ template <typename T>
 T* ndSharedPtr<T>::operator-> ()
 {
 	return m_ptr;
+}
+
+template <typename T>
+T* ndSharedPtr<T>::operator-> () const
+{
+	return m_ptr;
+}
+
+template <typename T>
+ndSharedPtr<T>::operator bool() const
+{
+	return m_ptr != nullptr;
 }
 
 #endif 

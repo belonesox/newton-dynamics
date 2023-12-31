@@ -28,34 +28,10 @@
 #define DG_CAPSULE_SEGMENTS		10
 #define DG_CAPSULE_CAP_SEGMENTS	12
 
-D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndShapeCapsule)
-
 ndShapeCapsule::ndShapeCapsule(ndFloat32 radius0, ndFloat32 radius1, ndFloat32 height)
 	:ndShapeConvex(m_capsule)
 {
 	Init(radius0, radius1, height);
-}
-
-ndShapeCapsule::ndShapeCapsule(const ndLoadSaveBase::ndLoadDescriptor& desc)
-	:ndShapeConvex(m_capsule)
-{
-	const nd::TiXmlNode* const xmlNode = desc.m_rootNode;
-	ndFloat32 radius0 = xmlGetFloat(xmlNode, "radius0");
-	ndFloat32 radius1 = xmlGetFloat(xmlNode, "radius1");
-	ndFloat32 height = xmlGetFloat(xmlNode, "height");
-	Init(radius0, radius1, height);
-}
-
-void ndShapeCapsule::Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
-{
-	nd::TiXmlElement* const childNode = new nd::TiXmlElement(ClassName());
-	desc.m_rootNode->LinkEndChild(childNode);
-	childNode->SetAttribute("hashId", desc.m_nodeNodeHash);
-	ndShapeConvex::Save(ndLoadSaveBase::ndSaveDescriptor(desc, childNode));
-
-	xmlSaveParam(childNode, "radius0", m_radius0);
-	xmlSaveParam(childNode, "radius1", m_radius0);
-	xmlSaveParam(childNode, "height", m_height * ndFloat32(2.0f));
 }
 
 void ndShapeCapsule::Init(ndFloat32 radio0, ndFloat32 radio1, ndFloat32 height)
@@ -153,7 +129,7 @@ void ndShapeCapsule::Init(ndFloat32 radio0, ndFloat32 radio1, ndFloat32 height)
 
 	m_vertexCount = ndUnsigned16(index);
 	ndShapeConvex::m_vertex = (ndVector*)ndMemory::Malloc(size_t(m_vertexCount * sizeof(ndVector)));
-	memcpy(ndShapeConvex::m_vertex, tempVertex, m_vertexCount * sizeof(ndVector));
+	ndMemCpy(ndShapeConvex::m_vertex, tempVertex, m_vertexCount);
 
 	ndPolyhedra polyhedra;
 	polyhedra.BeginFace();
@@ -524,3 +500,8 @@ void ndShapeCapsule::CalculateAabb(const ndMatrix& matrix, ndVector& p0, ndVecto
 	p1 = max_q0.GetMax(max_q1) & ndVector::m_triplexMask;
 }
 
+ndUnsigned64 ndShapeCapsule::GetHash(ndUnsigned64 hash) const
+{
+	ndShapeInfo info(GetShapeInfo());
+	return info.GetHash(hash);
+}

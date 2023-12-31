@@ -46,7 +46,7 @@ class ndFaceArrayDatabase : public ndShapeDebugNotify
 							ndAssert(pointCount < ndInt32(sizeof(pointCloud2d) / sizeof(pointCloud2d[0])));
 						}
 					}
-					pointCount = dConvexHull2d(pointCloud2d, pointCount);
+					pointCount = ndConvexHull2d(pointCloud2d, pointCount);
 
 					ndInt32 k0 = pointCount - 1;
 					for (ndInt32 k = 0; k < pointCount; ++k)
@@ -121,7 +121,7 @@ class ndFaceArrayDatabase : public ndShapeDebugNotify
 			matrix.m_right = face0.m_plane & ndVector::m_triplexMask;
 			matrix.m_up = matrix.m_right.CrossProduct(matrix.m_front) & ndVector::m_triplexMask;
 			matrix.m_posit.m_w = 1.0f;
-			matrix = matrix.Inverse();
+			matrix = matrix.OrthoInverse();
 
 			ndFaceInfo transformedFace;
 			for (ndInt32 j = 0; j < face0.m_count; ++j)
@@ -254,8 +254,9 @@ ndConvexFracture::ndDebrisNotify::ndDebrisNotify(ndDemoEntityManager* const mana
 
 void ndConvexFracture::ndDebrisNotify::OnObjectPick() const
 {
+	ndAssert(0);
 	ndTrace(("debris entity id: %d    ", ((ndConvexFractureEntity*)m_entity)->m_enumerator));
-	ndDemoEntityNotify::OnObjectPick();
+	//ndDemoEntityNotify::OnObjectPick();
 }
 
 ndConvexFracture::ndConvexFracture()
@@ -363,7 +364,7 @@ void ndConvexFracture::AddEffect(ndDemoEntityManager* const scene, const ndMatri
 	ndConvexFractureRootEntity* const entity = new ndConvexFractureRootEntity(*rootEntity);
 	scene->AddEntity(entity);
 
-	ndWorld* const world = scene->GetWorld();
+	//ndWorld* const world = scene->GetWorld();
 
 	ndInt32 bodyCount = 0;
 	for (ndConvexFractureEntity* debrisEnt = (ndConvexFractureEntity*)entity->GetFirstChild(); debrisEnt; debrisEnt = (ndConvexFractureEntity*)debrisEnt->GetNext())
@@ -377,8 +378,8 @@ void ndConvexFracture::AddEffect(ndDemoEntityManager* const scene, const ndMatri
 	ndBodyDynamic** const bodyArray = ndAlloca(ndBodyDynamic*, bodyCount);
 	memset(bodyArray, 0, bodyCount * sizeof(ndBodyDynamic*));
 	
-	ndInt32 debrisID = ndApplicationMaterial::m_dedris;
 	ndAssert(0);
+	//ndInt32 debrisID = ndApplicationMaterial::m_dedris;
 	//ndMaterial& material0 = callback->RegisterMaterial(ndContactCallback::m_default, ndContactCallback::m_dedris);
 	//ndAssert(0);
 	//material0;

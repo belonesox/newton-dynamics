@@ -24,32 +24,13 @@
 #include "ndContact.h"
 #include "ndBodyTriggerVolume.h"
 
-D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndBodyTriggerVolume)
-
 ndBodyTriggerVolume::ndBodyTriggerVolume()
 	:ndBodyKinematicBase()
 {
-	//m_contactTestOnly = 1;
-}
-
-ndBodyTriggerVolume::ndBodyTriggerVolume(const ndLoadSaveBase::ndLoadDescriptor& desc)
-	:ndBodyKinematicBase(ndLoadSaveBase::ndLoadDescriptor(desc))
-{
-	//m_contactTestOnly = 1;
 }
 
 ndBodyTriggerVolume::~ndBodyTriggerVolume()
 {
-}
-
-void ndBodyTriggerVolume::Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
-{
-	nd::TiXmlElement* const childNode = new nd::TiXmlElement(ClassName());
-	desc.m_rootNode->LinkEndChild(childNode);
-	childNode->SetAttribute("hashId", desc.m_nodeNodeHash);
-	ndBodyKinematicBase::Save(ndLoadSaveBase::ndSaveDescriptor(desc, childNode));
-
-	// nothing to save so far
 }
 
 void ndBodyTriggerVolume::SpecialUpdate(ndFloat32 timestep)
@@ -60,9 +41,11 @@ void ndBodyTriggerVolume::SpecialUpdate(ndFloat32 timestep)
 	for (it.Begin(); it; it++)
 	{
 		const ndContact* const contact = *it;
-		if (contact->IsActive())
+		if (contact->IsActive() && contact->IsInTrigger())
 		{
-			OnTrigger(contact->GetBody0(), timestep);
+			ndBodyKinematic* const body0 = contact->GetBody0();
+			ndBodyKinematic* const body1 = contact->GetBody1();
+			OnTrigger((body1 == this) ? body0 : body1, timestep);
 		}
 	}
 }

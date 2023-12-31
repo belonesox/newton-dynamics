@@ -80,8 +80,13 @@ class ndShapeMaterial
 {
 	public:
 	ndShapeMaterial()
+		:m_userId(0)
 	{
-		memset(this, 0, sizeof(ndShapeMaterial));
+		m_data.m_alignPad = 0;
+		for (ndInt32 i = 0; i < sizeof(m_userParam) / sizeof(m_userParam[0]); ++i)
+		{
+			m_userParam[i].m_intData = 0;
+		}
 	}
 
 	ndInt64 m_userId;
@@ -93,8 +98,9 @@ class ndShapeMaterial
 
 	union dExtraData
 	{
-		ndUnsigned64 m_intData;
+		void* m_ptrData;
 		ndFloat32 m_floatData;
+		ndUnsigned64 m_intData;
 	} m_userParam[6];
 };
 
@@ -181,6 +187,9 @@ D_MSV_NEWTON_ALIGN_32
 class ndShapeInfo
 {
 	public:
+	ndShapeInfo();
+	ndUnsigned64 GetHash(ndUnsigned64 hash);
+
 	ndMatrix m_offsetMatrix;
 	ndVector m_scale;
 	ndShapeMaterial m_shapeMaterial;
@@ -199,16 +208,16 @@ class ndShapeInfo
 		ndHeighfieldInfo m_heightfield;
 		ndProceduralInfo m_procedural;
 		ndChamferCylinderInfo m_chamferCylinder;
-		
 		ndFloat32 m_paramArray[32];
 	};
+
 } D_GCC_NEWTON_ALIGN_32;
 
 D_MSV_NEWTON_ALIGN_32
 class ndShape: public ndContainersFreeListAlloc<ndShape>
 {
 	public:
-	D_CLASS_REFLECTION(ndShape);
+	D_BASE_CLASS_REFLECTION(ndShape)
 	D_COLLISION_API virtual ~ndShape();
 
 	D_COLLISION_API ndInt32 GetRefCount() const;
@@ -245,6 +254,7 @@ class ndShape: public ndContainersFreeListAlloc<ndShape>
 	virtual ndFloat32 GetVolume() const = 0;
 	virtual ndFloat32 GetBoxMinRadius() const = 0;
 	virtual ndFloat32 GetBoxMaxRadius() const = 0;
+	virtual ndUnsigned64 GetHash(ndUnsigned64 hash = 0) const;
 
 	virtual void CalculateAabb(const ndMatrix& matrix, ndVector& p0, ndVector& p1) const = 0;
 	virtual ndVector SupportVertex(const ndVector& dir, ndInt32* const vertexIndex) const = 0;
@@ -256,8 +266,6 @@ class ndShape: public ndContainersFreeListAlloc<ndShape>
 
 	virtual ndMatrix CalculateInertiaAndCenterOfMass(const ndMatrix& alignMatrix, const ndVector& localScale, const ndMatrix& matrix) const;
 	virtual ndFloat32 CalculateMassProperties(const ndMatrix& offset, ndVector& inertia, ndVector& crossInertia, ndVector& centerOfMass) const;
-
-	D_COLLISION_API virtual void Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const;
 
 	protected:
 	D_COLLISION_API ndShape(ndShapeID id);
@@ -271,8 +279,28 @@ class ndShape: public ndContainersFreeListAlloc<ndShape>
 	mutable ndAtomic<ndInt32> m_refCount;
 	ndShapeID m_collisionId;
 	static ndVector m_flushZero;
-
+	friend class ndFileFormatShape;
 } D_GCC_NEWTON_ALIGN_32;
+
+inline ndShapeInfo::ndShapeInfo()
+	:m_offsetMatrix(ndGetIdentityMatrix())
+	,m_scale(ndFloat32 (1.0f))
+	,m_shapeMaterial()
+	,m_collisionType(::m_box)
+{
+	for (ndInt32 i = 0; i < sizeof(m_paramArray) / sizeof(m_paramArray[0]); ++i)
+	{
+		m_paramArray[i] = ndFloat32(0);
+	}
+}
+
+inline ndUnsigned64 ndShapeInfo::GetHash(ndUnsigned64 hash)
+{
+	ndInt32 id = m_collisionType;
+	hash = ndCRC64(m_paramArray, sizeof (m_paramArray), hash);
+	hash = ndCRC64(&id, sizeof(id), hash);
+	return hash;
+}
 
 inline ndInt32 ndShape::GetConvexVertexCount() const
 {
@@ -304,6 +332,12 @@ inline ndVector ndShape::GetObbSize() const
 inline ndFloat32 ndShape::GetUmbraClipSize() const
 {
 	return ndFloat32(3.0f) * GetBoxMaxRadius();
+}
+
+inline ndUnsigned64 ndShape::GetHash(ndUnsigned64 hash) const
+{
+	ndAssert(0);
+	return hash;
 }
 
 #endif 

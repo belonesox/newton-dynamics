@@ -10,10 +10,8 @@
 */
 
 #include "ndSandboxStdafx.h"
-#include "ndContactCallback.h"
+#include "ndPhysicsWorld.h"
 #include "ndArchimedesBuoyancyVolume.h"
-
-D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndArchimedesBuoyancyVolume);
 
 ndArchimedesBuoyancyVolume::ndArchimedesBuoyancyVolume()
 	:ndBodyTriggerVolume()
@@ -21,16 +19,7 @@ ndArchimedesBuoyancyVolume::ndArchimedesBuoyancyVolume()
 	,m_density(1.0f)
 	,m_hasPlane(0)
 {
-}
-
-ndArchimedesBuoyancyVolume::ndArchimedesBuoyancyVolume(const ndLoadSaveBase::ndLoadDescriptor& desc)
-	:ndBodyTriggerVolume(ndLoadSaveBase::ndLoadDescriptor(desc))
-{
-	const nd::TiXmlNode* const xmlNode = desc.m_rootNode;
-	m_plane = xmlGetVector3(xmlNode, "planeNormal");
-	m_plane.m_w = xmlGetFloat(xmlNode, "planeDist");
-	m_density = xmlGetFloat(xmlNode, "density");
-	m_hasPlane = xmlGetInt(xmlNode, "hasPlane") ? true : false;
+	static ndFileDemoArchimedesBuoyancyVolume loadSave;
 }
 
 void ndArchimedesBuoyancyVolume::CalculatePlane(ndBodyKinematic* const body)
@@ -68,6 +57,7 @@ void ndArchimedesBuoyancyVolume::CalculatePlane(ndBodyKinematic* const body)
 
 void ndArchimedesBuoyancyVolume::OnTriggerEnter(ndBodyKinematic* const body, ndFloat32)
 {
+	ndTrace(("enter trigger body %d\n", body->GetId()));
 	CalculatePlane(body);
 }
 	
@@ -97,7 +87,7 @@ void ndArchimedesBuoyancyVolume::OnTrigger(ndBodyKinematic* const kinBody, ndFlo
 
 			ndShapeMaterial material(collision.GetMaterial());
 			body->GetCollisionShape().SetMaterial(material);
-			ndFloat32 density = material.m_userParam[ndContactCallback::m_density].m_floatData;
+			ndFloat32 density = material.m_userParam[ndDemoContactCallback::m_density].m_floatData;
 			ndFloat32 desplacedVolume = density * collision.GetVolume();
 				
 			ndFloat32 displacedMass = mass.m_w * volume / desplacedVolume;
@@ -130,21 +120,8 @@ void ndArchimedesBuoyancyVolume::OnTrigger(ndBodyKinematic* const kinBody, ndFlo
 	}
 }
 
-void ndArchimedesBuoyancyVolume::OnTriggerExit(ndBodyKinematic* const, ndFloat32)
+void ndArchimedesBuoyancyVolume::OnTriggerExit(ndBodyKinematic* const body, ndFloat32)
 {
-	//dTrace(("exit trigger body: %d\n", body->GetId()));
+	//ndTrace(("exit trigger body: %d\n", body->GetId()));
+	ndExpandTraceMessage("exit trigger body: %d\n", body->GetId());
 }
-
-void ndArchimedesBuoyancyVolume::Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
-{
-	nd::TiXmlElement* const childNode = new nd::TiXmlElement(ClassName());
-	desc.m_rootNode->LinkEndChild(childNode);
-	childNode->SetAttribute("hashId", desc.m_nodeNodeHash);
-	ndBodyTriggerVolume::Save(ndLoadSaveBase::ndSaveDescriptor(desc, childNode));
-
-	xmlSaveParam(childNode, "planeNormal", m_plane);
-	xmlSaveParam(childNode, "planeDist", m_plane.m_w);
-	xmlSaveParam(childNode, "density", m_density);
-	xmlSaveParam(childNode, "hasPlane", m_hasPlane ? 1 : 0);
-}
-

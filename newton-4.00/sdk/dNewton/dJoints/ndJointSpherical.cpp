@@ -13,7 +13,18 @@
 #include "ndNewtonStdafx.h"
 #include "ndJointSpherical.h"
 
-D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndJointSpherical)
+ndJointSpherical::ndJointSpherical()
+	:ndJointBilateralConstraint()
+	,m_rotation(ndGetIdentityMatrix())
+	,m_springK(ndFloat32(0.0f))
+	,m_damperC(ndFloat32(0.0f))
+	,m_maxConeAngle(ndFloat32(1.0e10f))
+	,m_minTwistAngle(-ndFloat32(1.0e10f))
+	,m_maxTwistAngle(ndFloat32(1.0e10f))
+	,m_springDamperRegularizer(ndFloat32(0.0f))
+{
+	m_maxDof = 9;
+}
 
 ndJointSpherical::ndJointSpherical(const ndMatrix& pinAndPivotFrame, ndBodyKinematic* const child, ndBodyKinematic* const parent)
 	:ndJointBilateralConstraint(9, child, parent, pinAndPivotFrame)
@@ -27,45 +38,8 @@ ndJointSpherical::ndJointSpherical(const ndMatrix& pinAndPivotFrame, ndBodyKinem
 {
 }
 
-ndJointSpherical::ndJointSpherical(const ndLoadSaveBase::ndLoadDescriptor& desc)
-	:ndJointBilateralConstraint(ndLoadSaveBase::ndLoadDescriptor(desc))
-	,m_rotation(ndGetIdentityMatrix())
-	,m_springK(ndFloat32(0.0f))
-	,m_damperC(ndFloat32(0.0f))
-	,m_maxConeAngle(ndFloat32(1.0e10f))
-	,m_minTwistAngle(-ndFloat32(1.0e10f))
-	,m_maxTwistAngle(ndFloat32(1.0e10f))
-	,m_springDamperRegularizer(ndFloat32(0.0f))
-{
-	const nd::TiXmlNode* const xmlNode = desc.m_rootNode;
-
-	m_rotation = xmlGetMatrix(xmlNode, "rotation");
-	m_springK = xmlGetFloat(xmlNode, "springK");
-	m_damperC = xmlGetFloat(xmlNode, "damperC");
-	m_maxConeAngle = xmlGetFloat(xmlNode, "maxConeAngle");
-	m_minTwistAngle = xmlGetFloat(xmlNode, "minTwistAngle");
-	m_maxTwistAngle = xmlGetFloat(xmlNode, "maxTwistAngle");
-	m_springDamperRegularizer = xmlGetFloat(xmlNode, "springDamperRegularizer");
-}
-
 ndJointSpherical::~ndJointSpherical()
 {
-}
-
-void ndJointSpherical::Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
-{
-	nd::TiXmlElement* const childNode = new nd::TiXmlElement(ClassName());
-	desc.m_rootNode->LinkEndChild(childNode);
-	childNode->SetAttribute("hashId", desc.m_nodeNodeHash);
-	ndJointBilateralConstraint::Save(ndLoadSaveBase::ndSaveDescriptor(desc, childNode));
-
-	xmlSaveParam(childNode, "rotation", m_rotation);
-	xmlSaveParam(childNode, "springK", m_springK);
-	xmlSaveParam(childNode, "damperC", m_damperC);
-	xmlSaveParam(childNode, "maxConeAngle", m_maxConeAngle);
-	xmlSaveParam(childNode, "minTwistAngle", m_minTwistAngle);
-	xmlSaveParam(childNode, "maxTwistAngle", m_maxTwistAngle);
-	xmlSaveParam(childNode, "springDamperRegularizer", m_springDamperRegularizer);
 }
 
 ndFloat32 ndJointSpherical::PenetrationOmega(ndFloat32 penetration) const
@@ -89,7 +63,7 @@ void ndJointSpherical::SetAsSpringDamper(ndFloat32 regularizer, ndFloat32 spring
 {
 	m_springK = ndAbs(spring);
 	m_damperC = ndAbs(damper);
-	m_springDamperRegularizer = ndClamp(regularizer, ndFloat32(1.0e-2f), ndFloat32(0.99f));
+	m_springDamperRegularizer = ndClamp(regularizer, ndFloat32(1.0e-3f), ndFloat32(0.99f));
 }
 
 void ndJointSpherical::GetSpringDamper(ndFloat32& regularizer, ndFloat32& spring, ndFloat32& damper) const
@@ -143,12 +117,12 @@ void ndJointSpherical::DebugJoint(ndConstraintDebugCallback& debugCallback) cons
 		if (mag2 > ndFloat32 (1.0e-4f)) 
 		{
 			lateralDir = lateralDir.Scale(ndFloat32 (1.0f) / ndSqrt(mag2));
-			coneRotation = ndMatrix(ndQuaternion(lateralDir, ndAcos(ndClamp(cosAngleCos, ndFloat32(-1.0f), ndFloat32(1.0f)))), matrix1.m_posit);
+			coneRotation = ndCalculateMatrix(ndQuaternion(lateralDir, ndAcos(ndClamp(cosAngleCos, ndFloat32(-1.0f), ndFloat32(1.0f)))), matrix1.m_posit);
 		}
 		else 
 		{
 			lateralDir = matrix0.m_up.Scale(-ndFloat32 (1.0f));
-			coneRotation = ndMatrix(ndQuaternion(matrix0.m_up, ndFloat32 (180.0f) * ndDegreeToRad), matrix1.m_posit);
+			coneRotation = ndCalculateMatrix(ndQuaternion(matrix0.m_up, ndFloat32 (180.0f) * ndDegreeToRad), matrix1.m_posit);
 		}
 	}
 	else if (cosAngleCos < -ndFloat32 (0.9999f)) 
@@ -269,7 +243,7 @@ void ndJointSpherical::SubmitAngularAxis(const ndMatrix& matrix0, const ndMatrix
 		ndAssert(lateralDir.DotProduct(lateralDir).GetScalar() > 1.0e-6f);
 		lateralDir = lateralDir.Normalize();
 		const ndFloat32 coneAngle = ndAcos(ndClamp(matrix1.m_front.DotProduct(matrix0.m_front).GetScalar(), ndFloat32(-1.0f), ndFloat32(1.0f)));
-		const ndMatrix coneRotation(ndQuaternion(lateralDir, coneAngle), matrix1.m_posit);
+		const ndMatrix coneRotation(ndCalculateMatrix(ndQuaternion(lateralDir, coneAngle), matrix1.m_posit));
 		if (coneAngle > m_maxConeAngle)
 		{
 			if (m_maxConeAngle > (ndFloat32(1.0f) * ndDegreeToRad))
@@ -296,7 +270,7 @@ void ndJointSpherical::SubmitAngularAxis(const ndMatrix& matrix0, const ndMatrix
 			}
 		}
 
-		const ndMatrix pitchMatrix(matrix1 * coneRotation * matrix0.Inverse());
+		const ndMatrix pitchMatrix(matrix1 * coneRotation * matrix0.OrthoInverse());
 		const ndFloat32 pitchAngle = -ndAtan2(pitchMatrix[1][2], pitchMatrix[1][1]);
 		SubmitTwistAngle(matrix0.m_front, pitchAngle, desc);
 	}
@@ -312,13 +286,13 @@ void ndJointSpherical::ApplyBaseRows(const ndMatrix& matrix0, const ndMatrix& ma
 void ndJointSpherical::SubmitSpringDamper(const ndMatrix& matrix0, const ndMatrix& matrix1, ndConstraintDescritor& desc)
 {
 	const ndMatrix matrix11(m_rotation * matrix1);
-	const ndQuaternion rotation(matrix0.Inverse() * matrix11);
+	const ndQuaternion rotation(matrix0.OrthoInverse() * matrix11);
 	const ndVector pin(rotation & ndVector::m_triplexMask);
 	const ndFloat32 dirMag2 = pin.DotProduct(pin).GetScalar();
 	const ndFloat32 tol = ndFloat32(3.0f * ndPi / 180.0f);
 	if (dirMag2 > (tol * tol))
 	{
-		const ndMatrix basis(pin);
+		const ndMatrix basis(ndGramSchmidtMatrix(pin));
 		const ndFloat32 dirMag = ndSqrt(dirMag2);
 		const ndFloat32 angle = ndFloat32(2.0f) * ndAtan2(dirMag, rotation.m_w);
 

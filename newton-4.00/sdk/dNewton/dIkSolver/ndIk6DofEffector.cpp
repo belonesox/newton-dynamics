@@ -13,81 +13,46 @@
 #include "ndNewtonStdafx.h"
 #include "ndIk6DofEffector.h"
 
-D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndIk6DofEffector)
-
-ndIk6DofEffector::ndIk6DofEffector(const ndMatrix& pinAndPivotChild, const ndMatrix& pinAndPivotParent, ndBodyKinematic* const child, ndBodyKinematic* const parent)
-	:ndJointBilateralConstraint(6, child, parent, pinAndPivotChild, pinAndPivotParent)
-	,m_targetFrame(pinAndPivotChild * pinAndPivotParent.Inverse())
+ndIk6DofEffector::ndIk6DofEffector()
+	:ndJointBilateralConstraint()
+	,m_targetFrame(ndGetIdentityMatrix())
 	,m_angularSpring(ndFloat32(1000.0f))
 	,m_angularDamper(ndFloat32(50.0f))
 	,m_angularMaxTorque(D_LCP_MAX_VALUE)
 	,m_angularRegularizer(ndFloat32(5.0e-3f))
+	,m_angularMaxSpringRamp(ndFloat32(1.0e10f))
 	,m_linearSpring(ndFloat32(1000.0f))
 	,m_linearDamper(ndFloat32(50.0f))
 	,m_linearMaxForce(D_LCP_MAX_VALUE)
 	,m_linearRegularizer(ndFloat32(5.0e-3f))
+	,m_linearMaxSpringRamp(ndFloat32(1.0e10f))
+	,m_rotationType(m_disabled)
+	,m_controlDofOptions(0xff)
+{
+	m_maxDof = 6;
+}
+
+ndIk6DofEffector::ndIk6DofEffector(const ndMatrix& pinAndPivotChild, const ndMatrix& pinAndPivotParent, ndBodyKinematic* const child, ndBodyKinematic* const parent)
+	:ndJointBilateralConstraint(6, child, parent, pinAndPivotChild, pinAndPivotParent)
+	,m_targetFrame(pinAndPivotChild * pinAndPivotParent.OrthoInverse())
+	,m_angularSpring(ndFloat32(1000.0f))
+	,m_angularDamper(ndFloat32(50.0f))
+	,m_angularMaxTorque(D_LCP_MAX_VALUE)
+	,m_angularRegularizer(ndFloat32(5.0e-3f))
+	,m_angularMaxSpringRamp(ndFloat32(1.0e10f))
+	,m_linearSpring(ndFloat32(1000.0f))
+	,m_linearDamper(ndFloat32(50.0f))
+	,m_linearMaxForce(D_LCP_MAX_VALUE)
+	,m_linearRegularizer(ndFloat32(5.0e-3f))
+	,m_linearMaxSpringRamp(ndFloat32(1.0e10f))
 	,m_rotationType(m_disabled)
 	,m_controlDofOptions(0xff)
 {
 	SetSolverModel(m_jointkinematicCloseLoop);
 }
 
-ndIk6DofEffector::ndIk6DofEffector(const ndLoadSaveBase::ndLoadDescriptor& desc)
-	:ndJointBilateralConstraint(ndLoadSaveBase::ndLoadDescriptor(desc))
-	,m_targetFrame(ndGetIdentityMatrix())
-	,m_angularSpring(ndFloat32(1000.0f))
-	,m_angularDamper(ndFloat32(50.0f))
-	,m_angularMaxTorque(D_LCP_MAX_VALUE)
-	,m_angularRegularizer(ndFloat32(5.0e-3f))
-	,m_linearSpring(ndFloat32(1000.0f))
-	,m_linearDamper(ndFloat32(50.0f))
-	,m_linearMaxForce(D_LCP_MAX_VALUE)
-	,m_linearRegularizer(ndFloat32(5.0e-3f))
-	,m_rotationType(m_disabled)
-	,m_controlDofOptions(0xff)
-{
-	const nd::TiXmlNode* const xmlNode = desc.m_rootNode;
-	
-	m_targetFrame = xmlGetMatrix(xmlNode, "targetFrame");
-
-	m_angularSpring = xmlGetFloat(xmlNode, "angularSpring");
-	m_angularDamper = xmlGetFloat(xmlNode, "angularDamper");
-	m_angularMaxTorque = xmlGetFloat(xmlNode, "angularMaxTorque");
-	m_angularRegularizer = xmlGetFloat(xmlNode, "angularRegularizer");
-	
-	m_linearSpring = xmlGetFloat(xmlNode, "linearSpring");
-	m_linearDamper = xmlGetFloat(xmlNode, "linearDamper");
-	m_linearMaxForce = xmlGetFloat(xmlNode, "linearMaxForce");
-	m_linearRegularizer = xmlGetFloat(xmlNode, "linearRegularizer");
-
-	m_rotationType = ndRotationType(xmlGetInt(xmlNode, "rotationType"));
-	m_controlDofOptions = ndUnsigned8(xmlGetInt(xmlNode, "controlDofOptions"));
-
-	//SetTargetOffset(m_targetPosit);
-}
-
 ndIk6DofEffector::~ndIk6DofEffector()
 {
-}
-
-void ndIk6DofEffector::Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
-{
-	nd::TiXmlElement* const childNode = new nd::TiXmlElement(ClassName());
-	desc.m_rootNode->LinkEndChild(childNode);
-	childNode->SetAttribute("hashId", desc.m_nodeNodeHash);
-	ndJointBilateralConstraint::Save(ndLoadSaveBase::ndSaveDescriptor(desc, childNode));
-
-	xmlSaveParam(childNode, "targetFrame", m_targetFrame);
-	xmlSaveParam(childNode, "angularSpring", m_angularSpring);
-	xmlSaveParam(childNode, "angularDamper", m_angularDamper);
-	xmlSaveParam(childNode, "angularMaxTorque", m_angularMaxTorque);
-	xmlSaveParam(childNode, "angularRegularizer", m_angularRegularizer);
-	xmlSaveParam(childNode, "linearSpring", m_linearSpring);
-	xmlSaveParam(childNode, "linearDamper", m_linearDamper);
-	xmlSaveParam(childNode, "linearMaxForce", m_linearMaxForce);
-	xmlSaveParam(childNode, "linearRegularizer", m_linearRegularizer);
-	xmlSaveParam(childNode, "rotationType", m_rotationType);
-	xmlSaveParam(childNode, "controlDofOptions", m_controlDofOptions);
 }
 
 void ndIk6DofEffector::EnableAxisX(bool state)
@@ -105,9 +70,29 @@ void ndIk6DofEffector::EnableAxisZ(bool state)
 	m_axisZ = ndUnsigned8(state ? 1 : 0);
 }
 
+bool ndIk6DofEffector::GetAxisX() const
+{
+	return m_axisX ? true : false;
+}
+
+bool ndIk6DofEffector::GetAxisY() const
+{
+	return m_axisY ? true : false;
+}
+
+bool ndIk6DofEffector::GetAxisZ() const
+{
+	return m_axisZ ? true : false;
+}
+
 void ndIk6DofEffector::EnableRotationAxis(ndRotationType type)
 {
 	m_rotationType = type;
+}
+
+ndIk6DofEffector::ndRotationType ndIk6DofEffector::GetRotationAxis() const
+{
+	return m_rotationType;
 }
 
 ndMatrix ndIk6DofEffector::GetOffsetMatrix() const
@@ -182,13 +167,13 @@ void ndIk6DofEffector::DebugJoint(ndConstraintDebugCallback& debugCallback) cons
 
 void ndIk6DofEffector::SubmitShortestPathAxis(const ndMatrix& matrix0, const ndMatrix& matrix1, ndConstraintDescritor& desc)
 {
-	const ndQuaternion rotation(matrix0.Inverse() * matrix1);
+	const ndQuaternion rotation(matrix0.OrthoInverse() * matrix1);
 	const ndVector pin(rotation & ndVector::m_triplexMask);
 	const ndFloat32 dirMag2 = pin.DotProduct(pin).GetScalar();
 	const ndFloat32 tol = ndFloat32(3.0f * ndPi / 180.0f);
 	if (dirMag2 > (tol * tol))
 	{
-		const ndMatrix basis(pin);
+		const ndMatrix basis(ndGramSchmidtMatrix(pin));
 		const ndFloat32 dirMag = ndSqrt(dirMag2);
 		const ndFloat32 angle = ndAtan2(dirMag, rotation.m_w);
 		AddAngularRowJacobian(desc, basis[0], angle);
@@ -266,7 +251,14 @@ void ndIk6DofEffector::SubmitLinearAxis(const ndMatrix& matrix0, const ndMatrix&
 		{
 			const ndVector pin = axisDir[i];
 			AddLinearRowJacobian(desc, posit0, posit1, pin);
-			SetMassSpringDamperAcceleration(desc, m_linearRegularizer, m_linearSpring, m_linearDamper*2.0f);
+
+			//m_linearMaxSpringRamp = 0.1f;
+			//ndFloat32 springError = ndClamp (GetJointErrorPosit(desc), -m_linearMaxSpringRamp, m_linearMaxSpringRamp);
+			//SetJointErrorPosit(desc, springError);
+			SetMassSpringDamperAcceleration(desc, m_linearRegularizer, m_linearSpring, m_linearDamper);
+			
+			//ndTrace(("xxxxxxxxxx %f %f\n", springError, GetMotorAcceleration(desc)));
+
 			SetLowerFriction(desc, -m_linearMaxForce);
 			SetHighFriction(desc, m_linearMaxForce);
 		}

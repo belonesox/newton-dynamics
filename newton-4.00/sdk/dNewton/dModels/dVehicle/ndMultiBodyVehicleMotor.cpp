@@ -27,7 +27,20 @@
 #include "ndMultiBodyVehicleMotor.h"
 #include "ndMultiBodyVehicleGearBox.h"
 
-D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndMultiBodyVehicleMotor)
+ndMultiBodyVehicleMotor::ndMultiBodyVehicleMotor()
+	:ndJointBilateralConstraint()
+	,m_omega(ndFloat32(0.0f))
+	,m_maxOmega(ndFloat32(100.0f))
+	,m_omegaStep(ndFloat32(16.0f))
+	,m_targetOmega(ndFloat32(0.0f))
+	,m_engineTorque(ndFloat32(0.0f))
+	,m_internalFriction(ndFloat32(100.0f))
+	//,m_vehicelModel(vehicelModel)
+	,m_vehicelModel(nullptr)
+{
+	m_maxDof = 3;
+	ndAssert(0);
+}
 
 ndMultiBodyVehicleMotor::ndMultiBodyVehicleMotor(ndBodyKinematic* const motor, ndMultiBodyVehicle* const vehicelModel)
 	:ndJointBilateralConstraint(3, motor, vehicelModel->m_chassis, motor->GetMatrix())
@@ -41,39 +54,11 @@ ndMultiBodyVehicleMotor::ndMultiBodyVehicleMotor(ndBodyKinematic* const motor, n
 {
 }
 
-ndMultiBodyVehicleMotor::ndMultiBodyVehicleMotor(const ndLoadSaveBase::ndLoadDescriptor& desc)
-	:ndJointBilateralConstraint(ndLoadSaveBase::ndLoadDescriptor(desc))
-	,m_omega(ndFloat32(0.0f))
-	,m_maxOmega(ndFloat32(100.0f))
-	,m_engineTorque(ndFloat32(0.0f))
-	,m_internalFriction(ndFloat32(100.0f))
-	,m_vehicelModel(nullptr)
-{
-	const nd::TiXmlNode* const xmlNode = desc.m_rootNode;
-	m_maxOmega = xmlGetFloat(xmlNode, "maxOmega");
-	m_omegaStep = xmlGetFloat(xmlNode, "omegaStep");
-	m_internalFriction = xmlGetFloat(xmlNode, "internalFriction");
-}
-
-void ndMultiBodyVehicleMotor::Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
-{
-	nd::TiXmlElement* const childNode = new nd::TiXmlElement(ClassName());
-	desc.m_rootNode->LinkEndChild(childNode);
-	childNode->SetAttribute("hashId", desc.m_nodeNodeHash);
-	ndJointBilateralConstraint::Save(ndLoadSaveBase::ndSaveDescriptor(desc, childNode));
-
-	xmlSaveParam(childNode, "maxOmega", m_maxOmega);
-	xmlSaveParam(childNode, "omegaStep", m_omegaStep);
-	xmlSaveParam(childNode, "internalFriction", m_internalFriction);
-}
-
 void ndMultiBodyVehicleMotor::AlignMatrix()
 {
 	ndMatrix matrix0;
 	ndMatrix matrix1;
 	CalculateGlobalMatrix(matrix0, matrix1);
-
-	//matrix1.m_posit += matrix1.m_up.Scale(1.0f);
 
 	m_body0->SetMatrixNoSleep(matrix1);
 	m_body0->SetVelocityNoSleep(m_body1->GetVelocity());
@@ -134,37 +119,39 @@ ndFloat32 ndMultiBodyVehicleMotor::CalculateAcceleration(ndConstraintDescritor& 
 	return accel;
 }
 
-void ndMultiBodyVehicleMotor::JacobianDerivative(ndConstraintDescritor& desc)
+//void ndMultiBodyVehicleMotor::JacobianDerivative(ndConstraintDescritor& desc)
+void ndMultiBodyVehicleMotor::JacobianDerivative(ndConstraintDescritor&)
 {
-	ndMatrix matrix0;
-	ndMatrix matrix1;
-	CalculateGlobalMatrix(matrix0, matrix1);
-
-	// two rows to restrict rotation around around the parent coordinate system
-	const ndFloat32 angle0 = CalculateAngle(matrix0.m_front, matrix1.m_front, matrix1.m_up);
-	const ndFloat32 angle1 = CalculateAngle(matrix0.m_front, matrix1.m_front, matrix1.m_right);
-
-	AddAngularRowJacobian(desc, matrix1.m_up, angle0);
-	AddAngularRowJacobian(desc, matrix1.m_right, angle1);
-
-	// add rotor joint acceleration
-	AddAngularRowJacobian(desc, matrix0.m_front * ndVector::m_negOne, ndFloat32(0.0f));
-
-	const ndFloat32 accel = CalculateAcceleration(desc);
-	const ndFloat32 torque = ndMax(m_engineTorque, m_internalFriction);
-	SetMotorAcceleration(desc, accel);
-	SetHighFriction(desc, torque);
-	SetLowerFriction(desc, -m_internalFriction);
-	SetDiagonalRegularizer(desc, ndFloat32(0.1f));
-
-	// add torque coupling to chassis.
-	const ndMultiBodyVehicleGearBox* const gearBox = *m_vehicelModel->m_gearBox;
-	ndAssert(gearBox);
-	if (gearBox && ndAbs(gearBox->GetRatio()) > ndFloat32(0.0f))
-	{
-		ndJacobian& chassisJacobian = desc.m_jacobian[desc.m_rowsCount - 1].m_jacobianM1;
-		chassisJacobian.m_angular = ndVector::m_zero;
-	}
+	ndAssert(0);
+	//ndMatrix matrix0;
+	//ndMatrix matrix1;
+	//CalculateGlobalMatrix(matrix0, matrix1);
+	//
+	//// two rows to restrict rotation around around the parent coordinate system
+	//const ndFloat32 angle0 = CalculateAngle(matrix0.m_front, matrix1.m_front, matrix1.m_up);
+	//const ndFloat32 angle1 = CalculateAngle(matrix0.m_front, matrix1.m_front, matrix1.m_right);
+	//
+	//AddAngularRowJacobian(desc, matrix1.m_up, angle0);
+	//AddAngularRowJacobian(desc, matrix1.m_right, angle1);
+	//
+	//// add rotor joint acceleration
+	//AddAngularRowJacobian(desc, matrix0.m_front * ndVector::m_negOne, ndFloat32(0.0f));
+	//
+	//const ndFloat32 accel = CalculateAcceleration(desc);
+	//const ndFloat32 torque = ndMax(m_engineTorque, m_internalFriction);
+	//SetMotorAcceleration(desc, accel);
+	//SetHighFriction(desc, torque);
+	//SetLowerFriction(desc, -m_internalFriction);
+	//SetDiagonalRegularizer(desc, ndFloat32(0.1f));
+	//
+	//// add torque coupling to chassis.
+	//const ndMultiBodyVehicleGearBox* const gearBox = *m_vehicelModel->m_gearBox;
+	//ndAssert(gearBox);
+	//if (gearBox && ndAbs(gearBox->GetRatio()) > ndFloat32(0.0f))
+	//{
+	//	ndJacobian& chassisJacobian = desc.m_jacobian[desc.m_rowsCount - 1].m_jacobianM1;
+	//	chassisJacobian.m_angular = ndVector::m_zero;
+	//}
 }
 
 

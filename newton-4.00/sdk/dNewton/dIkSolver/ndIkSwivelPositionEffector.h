@@ -18,24 +18,21 @@
 class ndIkSwivelPositionEffector: public ndJointBilateralConstraint
 {
 	public:
-	enum ndRotationOrder
-	{
-		m_pitchRollYaw,
-		m_pitchYawRoll,
-	};
+	D_CLASS_REFLECTION(ndIkSwivelPositionEffector, ndJointBilateralConstraint)
 
-	D_CLASS_REFLECTION(ndIkSwivelPositionEffector);
-	D_NEWTON_API ndIkSwivelPositionEffector(const ndLoadSaveBase::ndLoadDescriptor& desc);
-	D_NEWTON_API ndIkSwivelPositionEffector(const ndVector& childPivot, const ndMatrix& pinAndPivotParent, ndBodyKinematic* const child, ndBodyKinematic* const parent);
+	D_NEWTON_API ndIkSwivelPositionEffector();
+	D_NEWTON_API ndIkSwivelPositionEffector(const ndVector& childPivotInGlobalSpace, const ndMatrix& pinAndPivotParentInGlobalSpace, ndBodyKinematic* const child, ndBodyKinematic* const parent);
 	D_NEWTON_API virtual ~ndIkSwivelPositionEffector();
 
 	D_NEWTON_API ndVector GetLocalTargetPosition() const;
 	D_NEWTON_API void SetLocalTargetPosition(const ndVector& posit);
-
+	
 	D_NEWTON_API ndVector GetGlobalPosition() const;
+	D_NEWTON_API ndMatrix GetReferenceFrame() const;
 
 	D_NEWTON_API ndFloat32 GetSwivelAngle() const;
-	D_NEWTON_API void SetSwivelAngle(const ndFloat32 angle);
+	D_NEWTON_API void SetSwivelAngle(ndFloat32 angle);
+	D_NEWTON_API ndFloat32 CalculateLookAtSwivelAngle(const ndVector& lookAtDir) const;
 	
 	D_NEWTON_API void SetLinearSpringDamper(ndFloat32 regularizer, ndFloat32 springConst, ndFloat32 damperConst);
 	D_NEWTON_API void GetLinearSpringDamper(ndFloat32& regularizer, ndFloat32& springConst, ndFloat32& damperConst) const;
@@ -55,12 +52,15 @@ class ndIkSwivelPositionEffector: public ndJointBilateralConstraint
 	D_NEWTON_API ndFloat32 GetMaxTorque() const;
 	D_NEWTON_API void SetMaxTorque(ndFloat32 torque);
 
-	protected:
-	D_NEWTON_API void JacobianDerivative(ndConstraintDescritor& desc);
-	D_NEWTON_API void Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const;
 	D_NEWTON_API void DebugJoint(ndConstraintDebugCallback& debugCallback) const;
 
+	D_NEWTON_API ndVector GetEffectorPosit() const;
+	D_NEWTON_API void GetDynamicState(ndVector& posit, ndVector& veloc) const;
+
+	protected:
 	ndMatrix CalculateSwivelFrame(const ndMatrix& matrix1) const;
+	D_NEWTON_API void JacobianDerivative(ndConstraintDescritor& desc);
+
 	void SubmitLinearAxis(ndConstraintDescritor& desc, const ndMatrix& matrix0, const ndMatrix& matrix1);
 	void SubmitAngularAxis(ndConstraintDescritor& desc, const ndMatrix& matrix0, const ndMatrix& matrix1);
 	
@@ -79,7 +79,6 @@ class ndIkSwivelPositionEffector: public ndJointBilateralConstraint
 
 	ndFloat32 m_minWorkSpaceRadio;
 	ndFloat32 m_maxWorkSpaceRadio;
-	ndRotationOrder m_rotationOrder;
 	bool m_enableSwivelControl;
 };
 

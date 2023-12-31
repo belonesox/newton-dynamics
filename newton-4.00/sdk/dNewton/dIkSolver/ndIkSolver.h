@@ -39,10 +39,11 @@ class ndIkSolver: public ndClassAlloc
 
 	D_NEWTON_API void SolverBegin(ndSkeletonContainer* const skeleton, ndJointBilateralConstraint* const* joint, ndInt32 jointCount, ndWorld* const world, ndFloat32 timestep);
 	D_NEWTON_API void Solve();
+	D_NEWTON_API void UpdateJointAcceleration(ndConstraint* const joint);
 	D_NEWTON_API void SolverEnd();
 
-	D_NEWTON_API ndVector GetBodyForce(const ndBodyKinematic* const body) const;
-	D_NEWTON_API ndVector GetBodyTorque(const ndBodyKinematic* const body) const;
+	//D_NEWTON_API ndVector GetBodyForce(const ndBodyKinematic* const body) const;
+	//D_NEWTON_API ndVector GetBodyTorque(const ndBodyKinematic* const body) const;
 
 	private:
 	void BuildMassMatrix();
@@ -50,11 +51,12 @@ class ndIkSolver: public ndClassAlloc
 	void BuildJacobianMatrix(ndConstraint* const joint); 
 
 	ndBodyKinematic m_sentinelBody;
-	ndArray<ndInt32> m_savedBodiesIndex;
+	ndArray<ndContact*> m_contacts;
 	ndArray<ndBodyKinematic*> m_bodies;
-	ndArray<ndJacobian> m_internalForces;
+	ndArray<ndInt32> m_savedBodiesIndex;
 	ndArray<ndLeftHandSide> m_leftHandSide;
 	ndArray<ndRightHandSide> m_rightHandSide;
+	
 	ndWorld* m_world;
 	ndSkeletonContainer* m_skeleton;
 	ndFloat32 m_timestep;

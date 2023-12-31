@@ -56,7 +56,7 @@ static void AddBox(ndDemoEntityManager* const scene, const ndMatrix& origin, ndF
 {
 	ndBodyKinematic* const body = AddBox(scene, origin, mass, 1.0f, 1.0f, 1.0f);
 	ndShapeMaterial material;
-	material.m_userParam[ndContactCallback::m_density].m_floatData = density;
+	material.m_userParam[ndDemoContactCallback::m_density].m_floatData = density;
 	body->GetCollisionShape().SetMaterial(material);
 }
 
@@ -64,7 +64,7 @@ static void AddSphere1(ndDemoEntityManager* const scene, const ndMatrix& origin,
 {
 	ndBodyKinematic* const body = AddSphere(scene, origin, mass, 0.5f);
 	ndShapeMaterial material;
-	material.m_userParam[ndContactCallback::m_density].m_floatData = density;
+	material.m_userParam[ndDemoContactCallback::m_density].m_floatData = density;
 	body->GetCollisionShape().SetMaterial(material);
 }
 
@@ -72,7 +72,7 @@ static void AddCapsule(ndDemoEntityManager* const scene, const ndMatrix& origin,
 {
 	ndBodyKinematic* const body = AddCapsule(scene, origin, mass, 0.5f, 0.5f, 1.0f);
 	ndShapeMaterial material;
-	material.m_userParam[ndContactCallback::m_density].m_floatData = density;
+	material.m_userParam[ndDemoContactCallback::m_density].m_floatData = density;
 	body->GetCollisionShape().SetMaterial(material);
 }
 
@@ -80,7 +80,7 @@ static void AddConvexHull(ndDemoEntityManager* const scene, const ndMatrix& orig
 {
 	ndBodyKinematic* const body = AddConvexHull(scene, origin, mass, radius, high, segments);
 	ndShapeMaterial material;
-	material.m_userParam[ndContactCallback::m_density].m_floatData = density;
+	material.m_userParam[ndDemoContactCallback::m_density].m_floatData = density;
 	body->GetCollisionShape().SetMaterial(material);
 }
 
@@ -104,12 +104,16 @@ void ndBasicTrigger (ndDemoEntityManager* const scene)
 		}
 	};
 
-	AddBox(scene, PlaceMatrix(0.0f, 5.0f, -3.0f), 0.6f, 10.0f);
+	AddBox(scene, PlaceMatrix(0.0f, 20.0f, -3.0f), 0.6f, 10.0f);
 	AddSphere1(scene, PlaceMatrix(0.0f, 5.0f, 0.0f), 0.5f, 10.0f);
 	AddCapsule(scene, PlaceMatrix(0.0f, 5.0f, 3.0f), 0.7f, 10.0f);
 	AddConvexHull(scene, PlaceMatrix(-2.0f, 5.0f, -2.0f), 7, 1.0f, 1.5f, 0.8f, 10.0f);
 	AddConvexHull(scene, PlaceMatrix(-2.0f, 5.0f,  2.0f), 21, 1.0f, 1.5f, 0.7f, 10.0f);
 	AddConvexHull(scene, PlaceMatrix( 2.0f, 5.0f,  3.0f), 210, 1.0f, 1.5f, 0.9f, 10.0f);
+
+	//ndFileFormat xxxx;
+	//xxxx.CollectScene(scene->GetWorld());
+	//xxxx.SaveBodies("xxxx.nd");
 
 	ndQuaternion rot;
 	ndVector origin(-40.0f, 5.0f, 0.0f, 1.0f);

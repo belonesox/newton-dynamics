@@ -13,8 +13,8 @@
 #include "ndSkyBox.h"
 #include "ndDemoMesh.h"
 #include "ndUIEntity.h"
+#include "ndMeshLoader.h"
 #include "ndDemoCamera.h"
-#include "ndLoadFbxMesh.h"
 #include "ndPhysicsUtils.h"
 #include "ndPhysicsWorld.h"
 #include "ndMakeStaticMap.h"
@@ -124,14 +124,14 @@ namespace biped2
 			const ndShapeMaterial& material0 = instanceShape0.GetMaterial();
 			const ndShapeMaterial& material1 = instanceShape1.GetMaterial();
 
-			ndUnsigned64 pointer0 = material0.m_userParam[ndContactCallback::m_modelPointer].m_intData;
-			ndUnsigned64 pointer1 = material1.m_userParam[ndContactCallback::m_modelPointer].m_intData;
+			ndUnsigned64 pointer0 = material0.m_userParam[ndDemoContactCallback::m_modelPointer].m_intData;
+			ndUnsigned64 pointer1 = material1.m_userParam[ndDemoContactCallback::m_modelPointer].m_intData;
 			if (pointer0 == pointer1)
 			{
 				// here we know the part are from the same model.
 				// we can apply some more filtering by for now we just disable all self model collisions. 
-				ndUnsigned64 selfCollide0 = material0.m_userParam[ndContactCallback::m_materialFlags].m_intData;
-				ndUnsigned64 selfCollide1 = material1.m_userParam[ndContactCallback::m_materialFlags].m_intData;
+				ndUnsigned64 selfCollide0 = material0.m_userParam[ndDemoContactCallback::m_materialFlags].m_intData;
+				ndUnsigned64 selfCollide1 = material1.m_userParam[ndDemoContactCallback::m_materialFlags].m_intData;
 				if (!(selfCollide0 || selfCollide1))
 				{
 					return false;
@@ -170,27 +170,30 @@ namespace biped2
 			m_actionSize,
 		};
 
-		ndHumanoidBrain(ndInt32 numberOfImputs, ndInt32 numberOfOutputs)
+		//ndHumanoidBrain(ndInt32 numberOfImputs, ndInt32 numberOfOutputs)
+		ndHumanoidBrain(ndInt32, ndInt32)
 			:ndBrain()
 		{
-			const ndInt32 neuronsPerHiddenLayers = 16;
-			ndBrainLayer* const inputLayer = new ndBrainLayer(numberOfImputs, neuronsPerHiddenLayers, m_relu);
-			ndBrainLayer* const hiddenLayer0 = new ndBrainLayer(inputLayer->GetOuputSize(), neuronsPerHiddenLayers, m_relu);
-			ndBrainLayer* const hiddenLayer1 = new ndBrainLayer(hiddenLayer0->GetOuputSize(), neuronsPerHiddenLayers, m_relu);
-			//ndBrainLayer* const hiddenLayer2 = new ndBrainLayer(hiddenLayer1->GetOuputSize(), neuronsPerHiddenLayers, m_relu);
-			ndBrainLayer* const ouputLayer = new ndBrainLayer(hiddenLayer1->GetOuputSize(), numberOfOutputs, m_relu);
+			ndAssert(0);
+			//const ndInt32 neuronsPerHiddenLayers = 16;
+			//ndBrainLayerLinearActivated* const inputLayer = new ndBrainLayerLinearActivated(numberOfImputs, neuronsPerHiddenLayers, m_relu);
+			//ndBrainLayerLinearActivated* const hiddenLayer0 = new ndBrainLayerLinearActivated(inputLayer->GetOutputSize(), neuronsPerHiddenLayers, m_relu);
+			//ndBrainLayerLinearActivated* const hiddenLayer1 = new ndBrainLayerLinearActivated(hiddenLayer0->GetOutputSize(), neuronsPerHiddenLayers, m_relu);
+			////ndBrainLayer* const hiddenLayer2 = new ndBrainLayer(hiddenLayer1->GetOutputSize(), neuronsPerHiddenLayers, m_relu);
+			//ndBrainLayerLinearActivated* const ouputLayer = new ndBrainLayerLinearActivated(hiddenLayer1->GetOutputSize(), numberOfOutputs, m_relu);
+			//
+			//AddLayer(inputLayer);
+			//AddLayer(hiddenLayer0);
+			//AddLayer(hiddenLayer1);
+			////brain.AddLayer(hiddenLayer2);
+			//AddLayer(ouputLayer);
 
-			BeginAddLayer();
-			AddLayer(inputLayer);
-			AddLayer(hiddenLayer0);
-			AddLayer(hiddenLayer1);
-			//brain.AddLayer(hiddenLayer2);
-			AddLayer(ouputLayer);
-			EndAddLayer();
-			InitGaussianWeights(0.0f, 0.25f);
+			ndAssert(0);
+			//InitGaussianWeights(ndReal(0.125f));
 		}
 	};
 
+#if 0
 	class ndHumanoidModel : public ndModel
 	{
 		public:
@@ -682,7 +685,7 @@ namespace biped2
 
 	class ndHumanoidTraningModel : public ndHumanoidModel
 	{
-		enum ndTraningStage
+		enum ndTrainingStage
 		{
 			m_initTraining,
 			m_tickTrainingEpoch,
@@ -905,7 +908,7 @@ namespace biped2
 
 		void GetStateAndAction(ndFloat32 timestep)
 		{
-			GetState(m_dqnAgent.m_transition.m_state);
+			GetState(m_dqnAgent.m_transition.m_observation);
 			ndFloat32 exploit = ndRand();
 			if (m_dqnAgent.m_exploration > exploit)
 			{
@@ -920,7 +923,7 @@ namespace biped2
 			m_dqnAgent.m_transition.m_reward = 1.0f;
 			m_dqnAgent.m_transition.m_terminalState = false;
 
-			ndFloat32 dist = m_dqnAgent.m_transition.m_state[ndHumanoidBrain::ndModelStateParam::m_comSagittalPosit];
+			ndFloat32 dist = m_dqnAgent.m_transition.m_observation[ndHumanoidBrain::ndModelStateParam::m_comSagittalPosit];
 			if (ndAbs(dist) > 0.4f)
 			{
 				m_dqnAgent.m_transition.m_terminalState = true;
@@ -959,19 +962,19 @@ namespace biped2
 		ndFloat32 m_rollAngle;
 		ndInt32 m_traingCounter;
 		ndInt32 m_epochCounter;
-		ndTraningStage m_trainingState;
+		ndTrainingStage m_trainingState;
 	};
 
-	class ndBipedUI : public ndUIEntity
+	class ndModelUI : public ndUIEntity
 	{
 		public:
-		ndBipedUI(ndDemoEntityManager* const scene, ndHumanoidModel* const biped)
+		ndModelUI(ndDemoEntityManager* const scene, ndHumanoidModel* const biped)
 			:ndUIEntity(scene)
 			, m_biped(biped)
 		{
 		}
 
-		~ndBipedUI()
+		~ndModelUI()
 		{
 		}
 
@@ -988,14 +991,14 @@ namespace biped2
 
 			bool change = false;
 			ImGui::Text("distance");
-			change = change | ImGui::SliderFloat("##x", &info.m_x, -0.5f, 1.0f);
+			change = change || ImGui::SliderFloat("##x", &info.m_x, -0.5f, 1.0f);
 			ImGui::Text("roll");
-			change = change | ImGui::SliderFloat("##z", &info.m_z, -1.0f, 1.0f);
+			change = change || ImGui::SliderFloat("##z", &info.m_z, -1.0f, 1.0f);
 			ImGui::Text("yaw");
-			change = change | ImGui::SliderFloat("##y", &info.m_y, -1.0f, 1.0f);
+			change = change || ImGui::SliderFloat("##y", &info.m_y, -1.0f, 1.0f);
 
 			ImGui::Text("swivel");
-			change = change | ImGui::SliderFloat("##swivel", &info.m_swivel, -1.0f, 1.0f);
+			change = change || ImGui::SliderFloat("##swivel", &info.m_swivel, -1.0f, 1.0f);
 
 			ndHumanoidModel::ndEffectorInfo& info1 = m_biped->m_effectors[1];
 			info1.m_x = info.m_x;
@@ -1016,7 +1019,8 @@ namespace biped2
 
 		ndHumanoidModel* m_biped;
 	};
-};
+#endif
+}
 
 using namespace biped2;
 
@@ -1033,26 +1037,28 @@ void ndBipedTest_2(ndDemoEntityManager* const scene)
 	material.m_dynamicFriction1 = 0.9f;
 	
 	ndContactCallback* const callback = (ndContactCallback*)scene->GetWorld()->GetContactNotify();
-	callback->RegisterMaterial(material, ndApplicationMaterial::m_modelPart, ndApplicationMaterial::m_default);
-	callback->RegisterMaterial(material, ndApplicationMaterial::m_modelPart, ndApplicationMaterial::m_modelPart);
+	callback->RegisterMaterial(material, ndDemoContactCallback::m_modelPart, ndDemoContactCallback::m_default);
+	callback->RegisterMaterial(material, ndDemoContactCallback::m_modelPart, ndDemoContactCallback::m_modelPart);
 	
 	ndMatrix origin(ndGetIdentityMatrix());
 	origin.m_posit.m_x += 20.0f;
 	//AddCapsulesStacks(scene, origin, 10.0f, 0.25f, 0.25f, 0.5f, 10, 10, 7);
 	
 	origin.m_posit.m_x -= 20.0f;
-	ndSharedPtr<ndDemoEntity> modelMesh = ndDemoEntity::LoadFbx("walker.fbx", scene);
+	ndMeshLoader loader;
+	ndSharedPtr<ndDemoEntity> modelMesh = loader.LoadEntity("walker.fbx", scene);
 	
-	ndWorld* const world = scene->GetWorld();
-	ndHumanoidModel* const model = new ndHumanoidModel(scene, *modelMesh, origin, ragdollDefinition);
-	ndSharedPtr<ndModel> modelPtr(model);
-	ndSharedPtr<ndJointBilateralConstraint> fixJoint(new ndJointFix6dof(model->m_bodyArray[0]->GetMatrix(), model->m_bodyArray[0], world->GetSentinelBody()));
-	world->AddModel(modelPtr);
-	//world->AddJoint(fixJoint);
-
-	ndBipedUI* const bipedUI = new ndBipedUI(scene, model);
-	ndSharedPtr<ndUIEntity> bipedUIPtr(bipedUI);
-	scene->Set2DDisplayRenderFunction(bipedUIPtr);
+	ndAssert(0);
+	//ndWorld* const world = scene->GetWorld();
+	//ndHumanoidModel* const model = new ndHumanoidModel(scene, *modelMesh, origin, ragdollDefinition);
+	//ndSharedPtr<ndModel> modelPtr(model);
+	//ndSharedPtr<ndJointBilateralConstraint> fixJoint(new ndJointFix6dof(model->m_bodyArray[0]->GetMatrix(), model->m_bodyArray[0], world->GetSentinelBody()));
+	//world->AddModel(modelPtr);
+	////world->AddJoint(fixJoint);
+	//
+	//ndModelUI* const bipedUI = new ndModelUI(scene, model);
+	//ndSharedPtr<ndUIEntity> bipedUIPtr(bipedUI);
+	//scene->Set2DDisplayRenderFunction(bipedUIPtr);
 
 	ndQuaternion rot;
 	origin.m_posit.m_x -= 5.0f;
@@ -1075,29 +1081,30 @@ void ndBipedTest_2Trainer(ndDemoEntityManager* const scene)
 	material.m_dynamicFriction1 = 0.9f;
 	
 	ndContactCallback* const callback = (ndContactCallback*)scene->GetWorld()->GetContactNotify();
-	callback->RegisterMaterial(material, ndApplicationMaterial::m_modelPart, ndApplicationMaterial::m_default);
-	callback->RegisterMaterial(material, ndApplicationMaterial::m_modelPart, ndApplicationMaterial::m_modelPart);
+	callback->RegisterMaterial(material, ndDemoContactCallback::m_modelPart, ndDemoContactCallback::m_default);
+	callback->RegisterMaterial(material, ndDemoContactCallback::m_modelPart, ndDemoContactCallback::m_modelPart);
 	
 	ndMatrix origin(ndGetIdentityMatrix());
 	origin.m_posit.m_x += 20.0f;
 	//AddCapsulesStacks(scene, origin, 10.0f, 0.25f, 0.25f, 0.5f, 10, 10, 7);
 	
 	origin.m_posit.m_x -= 20.0f;
+	ndMeshLoader loader;
+	ndSharedPtr<ndDemoEntity> modelMesh(loader.LoadEntity("walker.fbx", scene));
 	
-	ndSharedPtr<ndDemoEntity> modelMesh(ndDemoEntity::LoadFbx("walker.fbx", scene));
-	
-	ndWorld* const world = scene->GetWorld();
-	ndHumanoidTraningModel* const model = new ndHumanoidTraningModel(scene, *modelMesh, origin, ragdollDefinition);
-	ndSharedPtr<ndModel> modelPtr(model);
-	ndSharedPtr<ndJointBilateralConstraint> fixJoint(new ndJointFix6dof(model->m_bodyArray[0]->GetMatrix(), model->m_bodyArray[0], world->GetSentinelBody()));
-	world->AddModel(modelPtr);
-	//world->AddJoint(fixJoint);
-
-	//scene->Set2DDisplayRenderFunction(ndHumanoidTraningModel::TrainingLoop, nullptr, model);
-	//scene->Set2DDisplayRenderFunction(ndHumanoidModel::ControlPanel, nullptr, model);
-	ndBipedUI* const bipedUI = new ndBipedUI(scene, model);
-	ndSharedPtr<ndUIEntity> bipedUIPtr(bipedUI);
-	scene->Set2DDisplayRenderFunction(bipedUIPtr);
+	ndAssert(0);
+	//ndWorld* const world = scene->GetWorld();
+	//ndHumanoidTraningModel* const model = new ndHumanoidTraningModel(scene, *modelMesh, origin, ragdollDefinition);
+	//ndSharedPtr<ndModel> modelPtr(model);
+	//ndSharedPtr<ndJointBilateralConstraint> fixJoint(new ndJointFix6dof(model->m_bodyArray[0]->GetMatrix(), model->m_bodyArray[0], world->GetSentinelBody()));
+	//world->AddModel(modelPtr);
+	////world->AddJoint(fixJoint);
+	//
+	////scene->Set2DDisplayRenderFunction(ndHumanoidTraningModel::TrainingLoop, nullptr, model);
+	////scene->Set2DDisplayRenderFunction(ndHumanoidModel::ControlPanel, nullptr, model);
+	//ndModelUI* const bipedUI = new ndModelUI(scene, model);
+	//ndSharedPtr<ndUIEntity> bipedUIPtr(bipedUI);
+	//scene->Set2DDisplayRenderFunction(bipedUIPtr);
 	
 	ndQuaternion rot(ndYawMatrix(ndPi * 0.5f));
 	//origin.m_posit.m_x -= 5.0f;

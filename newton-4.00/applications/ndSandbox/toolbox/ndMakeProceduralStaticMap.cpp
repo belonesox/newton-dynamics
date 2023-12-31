@@ -12,7 +12,6 @@
 #include "ndSandboxStdafx.h"
 #include "ndDemoMesh.h"
 #include "ndDemoEntity.h"
-#include "ndLoadFbxMesh.h"
 #include "ndDebugDisplay.h"
 #include "ndPhysicsWorld.h"
 #include "ndMakeStaticMap.h"
@@ -23,7 +22,40 @@
 class ndRegularProceduralGrid : public ndShapeStaticProceduralMesh
 {
 	public:
-	D_CLASS_REFLECTION(ndRegularProceduralGrid);
+	D_CLASS_REFLECTION(ndRegularProceduralGrid, ndShapeStaticProceduralMesh)
+
+	class ndRegularProceduralGridSaveLoad : public ndFileFormatShapeStaticProceduralMesh
+	{
+		public:
+		ndRegularProceduralGridSaveLoad()
+			:ndFileFormatShapeStaticProceduralMesh(ndRegularProceduralGrid::StaticClassName())
+		{
+		}
+
+		virtual ndInt32 SaveShape(ndFileFormatSave* const scene, nd::TiXmlElement* const parentNode, const ndShape* const shape)
+		{
+			nd::TiXmlElement* const classNode = xmlCreateClassNode(parentNode, "ndRegularProceduralGrid", ndRegularProceduralGrid::StaticClassName());
+			ndFileFormatShapeStaticProceduralMesh::SaveShape(scene, classNode, shape);
+
+			ndRegularProceduralGrid* const grid = (ndRegularProceduralGrid*)shape;
+			xmlSaveParam(classNode, "boxSize", grid->GetObbSize());
+			xmlSaveParam(classNode, "planeNormal", grid->m_planeEquation);
+			xmlSaveParam(classNode, "planeDistance", grid->m_planeEquation.m_w);
+			xmlSaveParam(classNode, "gridSize", grid->m_gridSize);
+			return xmlGetNodeId(classNode);
+		}
+
+		ndShape* LoadShape(const nd::TiXmlElement* const node, const ndTree<ndShape*, ndInt32>&)
+		{
+			ndVector boxSize (xmlGetVector3(node, "boxSize") * ndVector::m_two);
+			ndVector planeNormal (xmlGetVector3(node, "planeNormal"));
+			ndFloat32 planeDist = xmlGetFloat(node, "planeDistance");
+			ndFloat32 gridSize = xmlGetFloat(node, "gridSize");
+
+			planeNormal.m_w = planeDist;
+			return new ndRegularProceduralGrid(gridSize, boxSize.m_x, boxSize.m_y, boxSize.m_z, planeNormal);
+		}
+	};
 
 	ndRegularProceduralGrid(ndFloat32 gridSize, ndFloat32 sizex, ndFloat32 sizey, ndFloat32 sizez, const ndVector& planeEquation)
 		:ndShapeStaticProceduralMesh(sizex, sizey, sizez)
@@ -31,27 +63,7 @@ class ndRegularProceduralGrid : public ndShapeStaticProceduralMesh
 		,m_gridSize(gridSize)
 		,m_invGridSize(ndFloat32 (1.0f)/ m_gridSize)
 	{
-	}
-
-	ndRegularProceduralGrid(const ndLoadSaveBase::ndLoadDescriptor& desc)
-		:ndShapeStaticProceduralMesh(ndLoadSaveBase::ndLoadDescriptor(desc))
-	{
-		const nd::TiXmlNode* const xmlNode = desc.m_rootNode;
-
-		m_planeEquation = xmlGetVector3(xmlNode, "planeEquation");
-		m_gridSize = xmlGetFloat(xmlNode, "gridSize");
-		m_invGridSize = ndFloat32 (1.0f) / m_gridSize;
-	}
-
-	void Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
-	{
-		nd::TiXmlElement* const childNode = new nd::TiXmlElement(ClassName());
-		desc.m_rootNode->LinkEndChild(childNode);
-		childNode->SetAttribute("hashId", desc.m_nodeNodeHash);
-		ndShapeStaticProceduralMesh::Save(ndLoadSaveBase::ndSaveDescriptor(desc, childNode));
-
-		xmlSaveParam(childNode, "planeEquation", m_planeEquation);
-		xmlSaveParam(childNode, "gridSize", m_gridSize);
+		static ndRegularProceduralGridSaveLoad saveLoad;
 	}
 
 	virtual void DebugShape(const ndMatrix&, ndShapeDebugNotify& notify) const
@@ -80,7 +92,7 @@ class ndRegularProceduralGrid : public ndShapeStaticProceduralMesh
 				ndVector maxP;
 				ndMatrix matrix(body0->GetMatrix());
 				//collision.CalculateAabb(matrix.Inverse(), minP, maxP);
-				collision.CalculateAabb(matrix * myMatrix.Inverse(), minP, maxP);
+				collision.CalculateAabb(matrix * myMatrix.OrthoInverse(), minP, maxP);
 
 				vertex.SetCount(0);
 				faceList.SetCount(0);
@@ -163,11 +175,17 @@ class ndRegularProceduralGrid : public ndShapeStaticProceduralMesh
 		}
 	}
 
+	virtual ndUnsigned64 GetHash(ndUnsigned64 hash) const
+	{
+		hash = ndCRC64(&m_planeEquation[0], sizeof(ndVector), hash);
+		hash = ndCRC64(&m_gridSize, sizeof(ndFloat32), hash);
+		return hash;
+	}
+
 	ndVector m_planeEquation;
 	ndFloat32 m_gridSize;
 	ndFloat32 m_invGridSize;
 };
-D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndRegularProceduralGrid)
 
 ndDemoEntity* BuildVisualEntity(ndDemoEntityManager* const scene, ndInt32 grids, ndFloat32 gridSize, ndFloat32 perturbation)
 {

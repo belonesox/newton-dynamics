@@ -13,8 +13,6 @@
 #include "ndNewtonStdafx.h"
 #include "ndJointDoubleHinge.h"
 
-D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndJointDoubleHinge)
-
 ndJointDoubleHinge::ndAxisParam::ndAxisParam()
 	:m_angle(ndFloat32(0.0f))
 	,m_omega(ndFloat32(0.0f))
@@ -27,28 +25,12 @@ ndJointDoubleHinge::ndAxisParam::ndAxisParam()
 {
 }
 
-void ndJointDoubleHinge::ndAxisParam::Load(const nd::TiXmlElement* const xmlNode)
+ndJointDoubleHinge::ndJointDoubleHinge()
+	:ndJointBilateralConstraint()
+	,m_axis0()
+	,m_axis1()
 {
-	m_angle = xmlGetFloat(xmlNode, "angle");
-	m_omega = xmlGetFloat(xmlNode, "omega");
-	m_springK = xmlGetFloat(xmlNode, "springK");
-	m_damperC = xmlGetFloat(xmlNode, "damperC");
-	m_minLimit = xmlGetFloat(xmlNode, "minLimit");
-	m_maxLimit = xmlGetFloat(xmlNode, "maxLimit");
-	m_offsetAngle = xmlGetFloat(xmlNode, "offsetAngle");
-	m_springDamperRegularizer = xmlGetFloat(xmlNode, "springDamperRegularizer");
-}
-
-void ndJointDoubleHinge::ndAxisParam::Save(nd::TiXmlElement* const xmlNode) const
-{
-	xmlSaveParam(xmlNode, "angle", m_angle);
-	xmlSaveParam(xmlNode, "omega", m_omega);
-	xmlSaveParam(xmlNode, "springK", m_springK);
-	xmlSaveParam(xmlNode, "damperC", m_damperC);
-	xmlSaveParam(xmlNode, "minLimit", m_minLimit);
-	xmlSaveParam(xmlNode, "maxLimit", m_maxLimit);
-	xmlSaveParam(xmlNode, "offsetAngle", m_offsetAngle);
-	xmlSaveParam(xmlNode, "springDamperRegularizer", m_springDamperRegularizer);
+	m_maxDof = 8;
 }
 
 ndJointDoubleHinge::ndJointDoubleHinge(const ndMatrix& pinAndPivotFrame, ndBodyKinematic* const child, ndBodyKinematic* const parent)
@@ -58,40 +40,8 @@ ndJointDoubleHinge::ndJointDoubleHinge(const ndMatrix& pinAndPivotFrame, ndBodyK
 {
 }
 
-ndJointDoubleHinge::ndJointDoubleHinge(const ndLoadSaveBase::ndLoadDescriptor& desc)
-	:ndJointBilateralConstraint(ndLoadSaveBase::ndLoadDescriptor(desc))
-	,m_axis0()
-	,m_axis1()
-{
-	ndAssert(m_maxDof == 8);
-	const nd::TiXmlNode* const xmlNode = desc.m_rootNode;
-
-	const nd::TiXmlNode* const axis0 = xmlFind(xmlNode, "axis0");
-	m_axis0.Load((nd::TiXmlElement*)axis0);
-
-	const nd::TiXmlNode* const axis1 = xmlFind(xmlNode, "axis1");
-	m_axis1.Load((nd::TiXmlElement*)axis1);
-}
-
 ndJointDoubleHinge::~ndJointDoubleHinge()
 {
-}
-
-void ndJointDoubleHinge::Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
-{
-	nd::TiXmlElement* const childNode = new nd::TiXmlElement(ClassName());
-	desc.m_rootNode->LinkEndChild(childNode);
-	childNode->SetAttribute("hashId", desc.m_nodeNodeHash);
-	ndJointBilateralConstraint::Save(ndLoadSaveBase::ndSaveDescriptor(desc, childNode));
-
-	nd::TiXmlElement* const axis0 = new nd::TiXmlElement("axis0");
-	childNode->LinkEndChild(axis0);
-	m_axis0.Save(axis0);
-
-	nd::TiXmlElement* const axis1 = new nd::TiXmlElement("axis1");
-	childNode->LinkEndChild(axis1);
-	m_axis1.Save(axis1);
-
 }
 
 ndFloat32 ndJointDoubleHinge::GetAngle0() const
@@ -132,7 +82,14 @@ void ndJointDoubleHinge::SetAsSpringDamper0(ndFloat32 regularizer, ndFloat32 spr
 {
 	m_axis0.m_springK = ndAbs(spring);
 	m_axis0.m_damperC = ndAbs(damper);
-	m_axis0.m_springDamperRegularizer = ndClamp(regularizer, ndFloat32(1.0e-2f), ndFloat32(0.99f));
+	m_axis0.m_springDamperRegularizer = ndClamp(regularizer, ND_SPRING_DAMP_MIN_REG, ndFloat32(0.99f));
+}
+
+void ndJointDoubleHinge::GetSpringDamper0(ndFloat32& regularizer, ndFloat32& spring, ndFloat32& damper) const
+{
+	spring = m_axis0.m_springK;
+	damper = m_axis0.m_damperC;
+	regularizer = m_axis0.m_springDamperRegularizer;
 }
 
 ndFloat32 ndJointDoubleHinge::GetAngle1() const
@@ -173,7 +130,14 @@ void ndJointDoubleHinge::SetAsSpringDamper1(ndFloat32 regularizer, ndFloat32 spr
 {
 	m_axis1.m_springK = ndAbs(spring);
 	m_axis1.m_damperC = ndAbs(damper);
-	m_axis1.m_springDamperRegularizer = ndClamp(regularizer, ndFloat32(1.0e-2f), ndFloat32(0.99f));
+	m_axis1.m_springDamperRegularizer = ndClamp(regularizer, ND_SPRING_DAMP_MIN_REG, ndFloat32(0.99f));
+}
+
+void ndJointDoubleHinge::GetSpringDamper1(ndFloat32& regularizer, ndFloat32& spring, ndFloat32& damper) const
+{
+	spring = m_axis1.m_springK;
+	damper = m_axis1.m_damperC;
+	regularizer = m_axis1.m_springDamperRegularizer;
 }
 
 void ndJointDoubleHinge::DebugJoint(ndConstraintDebugCallback& debugCallback) const

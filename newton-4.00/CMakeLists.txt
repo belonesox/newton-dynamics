@@ -10,20 +10,21 @@
 
 cmake_minimum_required(VERSION 3.9.0 FATAL_ERROR)
 
-option("NEWTON_EXCLUDE_TEST" "generate test project" "OFF")
-option("NEWTON_BUILD_SANDBOX_DEMOS" "generates demos projects" "ON")
+option("NEWTON_BUILD_SANDBOX_DEMOS" "generates demos projects" ON)
+option("NEWTON_BUILD_PHYSIC_EDITOR" "generates authoring tool" OFF)
+option("NEWTON_EXCLUDE_UNIX_TEST" "generate unit test projects" OFF)
 option("NEWTON_BUILD_PROFILER" "build profiler" OFF)
+option("NEWTON_ENABLE_AVX2" "enable AVX2"  OFF)
 option("NEWTON_BUILD_SINGLE_THREADED" "single threaded" OFF)
 option("NEWTON_BUILD_SHARED_LIBS" "build shared library" ON)
 option("NEWTON_ENABLE_AVX2_SOLVER" "enable AVX2 solver"  ON)
 option("NEWTON_ENABLE_CUDA_SOLVER" "enable cuda solver" OFF)
-option("NEWTON_ENABLE_OPENCL_SOLVER" "enable gpu solver" OFF)
+option("NEWTON_ENABLE_SYCL_SOLVER" "enable sycl solver" OFF)
 option("NEWTON_DOUBLE_PRECISION" "generate double precision" OFF)
-option("NEWTON_NO_SIMD_INTRINSICS" "generate simd vector class" OFF)
+option("NEWTON_SCALAR_VECTOR_CLASS" "generate simd vector class" OFF)
 option("NEWTON_BUILD_NEWTON_JAVA" "build a sharp wrapper" OFF)
 option("NEWTON_BUILD_NEWTON_PYTHON" "build python wrapper" OFF)
 option("NEWTON_BUILD_NEWTON_C_SHARP" "build a sharp wrapper" OFF)
-option("NEWTON_BUILD_NEWTON_BLENDER" "build blender wrapper" OFF)
 option("NEWTON_BUILD_ANDROID_STUDIO" "build a android studio package" OFF)
 option("NEWTON_STATIC_RUNTIME_LIBRARIES" "use windows static libraries" OFF)
 option("NEWTON_BUILD_CREATE_SUB_PROJECTS" "generate independent subproject" OFF)
@@ -43,8 +44,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Don't use e.g. GNU extension (like -std=gnu++11) for portability
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-if(NEWTON_NO_SIMD_INTRINSICS)
+if(NEWTON_SCALAR_VECTOR_CLASS)
 	add_definitions(-DD_SCALAR_VECTOR_CLASS)
+endif()
+
+if (NEWTON_ENABLE_AVX2)
+	add_definitions(-DD_NEWTON_USE_AVX2_OPTION)
 endif()
 
 if(NEWTON_DOUBLE_PRECISION)
@@ -76,38 +81,46 @@ endif(APPLE)
 
 #check for UNIX
 if(UNIX)
-  # ----------------------------------------------------------------------
-  # Ensure the RPATH for libndNewton is set correctly both inside the build
-  # tree as well as in the installed location (ie after `make install`).
-  #
-  # The following settings were adapted from here
-  # https://gitlab.kitware.com/cmake/community/-/wikis/doc/cmake/RPATH-handling
+	  # ----------------------------------------------------------------------
+	  # Ensure the RPATH for libndNewton is set correctly both inside the build
+	  # tree as well as in the installed location (ie after `make install`).
+	  #
+	  # The following settings were adapted from here
+	  # https://gitlab.kitware.com/cmake/community/-/wikis/doc/cmake/RPATH-handling
 
-  # Use the full RPATH for the build tree.
-  set(CMAKE_SKIP_BUILD_RPATH FALSE)
+	  # Use the full RPATH for the build tree.
+	  set(CMAKE_SKIP_BUILD_RPATH FALSE)
 
-  # Do not use the install RPATH during building but use later on when we install the library.
-  set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+	  # Do not use the install RPATH during building but use later on when we install the library.
+	  set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
 
-  # Set this RPATH in the installed library.
-  # NOTE: specify CMAKE_INSTALL_PREFIX as an absolute path or it will almost certainly not work.
-  set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+	  # Set this RPATH in the installed library.
+	  # NOTE: specify CMAKE_INSTALL_PREFIX as an absolute path or it will almost certainly not work.
+	  set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 
-  # Add the automatically determined parts of the RPATH which point to directories
-  # outside the build tree to the install RPATH.
-  set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+	  # Add the automatically determined parts of the RPATH which point to directories
+	  # outside the build tree to the install RPATH.
+	  set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
-  # Only use the RPATH if the target is not a system directory.
-  list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
-  if("${isSystemDir}" STREQUAL "-1")
-    set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
-  endif("${isSystemDir}" STREQUAL "-1")
-  # ----------------------------------------------------------------------
+	  # Only use the RPATH if the target is not a system directory.
+	  list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
+	  if("${isSystemDir}" STREQUAL "-1")
+		set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+	  endif("${isSystemDir}" STREQUAL "-1")
+	  # ----------------------------------------------------------------------
 
-  set(CMAKE_POLICY_DEFAULT_CMP0072 NEW)
+	set(CMAKE_POLICY_DEFAULT_CMP0072 NEW)
 	if(NOT NEWTON_BUILD_SHARED_LIBS)
 		add_compile_options(-fPIC)
 	endif()
+
+	if (NEWTON_ENABLE_AVX2)
+		set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -march=haswell ")
+		set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=haswell ")
+		set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELEASE} -march=haswell ")
+	endif()
+
+	add_compile_options(-msse3)
 
 	include("GNUInstallDirs")
 
@@ -121,12 +134,6 @@ if(UNIX)
 		add_custom_target(uninstall
 			COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
 	endif()
-
-	#if(NOT ANDROID OR NOT APPLE)
-	#	add_compile_options(-msse3)
-	#endif()
-
-	#add_compile_options(-fpermissive)
 
 	set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
 	set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
@@ -160,12 +167,18 @@ if (MSVC)
 	endif()
 
 	message("Compiler Id: ${CMAKE_CXX_COMPILER_ID}") 
-	
+
 	set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Zi /Od /fp:fast")
 	set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELEASE} /Zi /O2 /fp:fast")
 	set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Zi /GS /Ox /Oi /Ot /Ob2 /Oy /fp:fast")
-	set(CMAKE_WARNINGS "/Wall /wd4061 /wd4201 /wd4324 /wd4505 /wd4514 /wd4582 /wd4587 /wd4625 /wd4626 /wd4710 /wd4711 /wd4371 /wd4571 /wd4623 /wd4668 /wd4774 /wd4820 /wd5026 /wd5027 /wd5039 /wd5045 /wd5264")
+	set(CMAKE_WARNINGS "/Wall /wd4061 /wd4201 /wd4263 /wd4264 /wd4266 /wd4324 /wd4505 /wd4514 /wd4582 /wd4587 /wd4625 /wd4626 /wd4710 /wd4711 /wd4371 /wd4571 /wd4623 /wd4668 /wd4774 /wd4820 /wd5026 /wd5027 /wd5039 /wd5045 /wd5264")
 
+	if(NEWTON_ENABLE_AVX2)
+		set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /arch:AVX2")
+		set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /arch:AVX2")
+		set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELEASE} /arch:AVX2")
+	endif()
+	
 	message("CMAKE_WARNINGS is ${CMAKE_WARNINGS}")
 	message("CMAKE_CXX_FLAGS_DEBUG is ${CMAKE_CXX_FLAGS_DEBUG}")
 	message("CMAKE_CXX_FLAGS_RELEASE is ${CMAKE_CXX_FLAGS_RELEASE}")
@@ -197,7 +210,7 @@ add_subdirectory(sdk)
 add_subdirectory(thirdParty)
 add_subdirectory(applications)
 
-if (NOT NEWTON_EXCLUDE_TEST)
+if (NOT NEWTON_EXCLUDE_UNIX_TEST AND (PTR_SIZE EQUAL 8))
 	message("building unit tests")
 	file(REMOVE_RECURSE ${PROJECT_BINARY_DIR}/_deps)
 	add_subdirectory(tests)

@@ -25,9 +25,6 @@ class ndJointDoubleHinge: public ndJointBilateralConstraint
 	{
 		public:
 		ndAxisParam();
-		void Load(const nd::TiXmlElement* const xmlNode);
-		void Save(nd::TiXmlElement* const xmlNode) const;
-
 		ndFloat32 m_angle;
 		ndFloat32 m_omega;
 		ndFloat32 m_springK;
@@ -38,8 +35,9 @@ class ndJointDoubleHinge: public ndJointBilateralConstraint
 		ndFloat32 m_springDamperRegularizer;
 	};
 
-	D_CLASS_REFLECTION(ndJointDoubleHinge);
-	D_NEWTON_API ndJointDoubleHinge(const ndLoadSaveBase::ndLoadDescriptor& desc);
+	D_CLASS_REFLECTION(ndJointDoubleHinge, ndJointBilateralConstraint)
+
+	D_NEWTON_API ndJointDoubleHinge();
 	D_NEWTON_API ndJointDoubleHinge(const ndMatrix& pinAndPivotFrame, ndBodyKinematic* const child, ndBodyKinematic* const parent);
 	D_NEWTON_API virtual ~ndJointDoubleHinge();
 
@@ -50,6 +48,7 @@ class ndJointDoubleHinge: public ndJointBilateralConstraint
 	D_NEWTON_API void SetLimits0(ndFloat32 minLimit, ndFloat32 maxLimit);
 	D_NEWTON_API void GetLimits0(ndFloat32& minLimit, ndFloat32& maxLimit);
 	D_NEWTON_API void SetAsSpringDamper0(ndFloat32 regularizer, ndFloat32 spring, ndFloat32 damper);
+	D_NEWTON_API void GetSpringDamper0(ndFloat32& regularizer, ndFloat32& spring, ndFloat32& damper) const;
 
 	D_NEWTON_API ndFloat32 GetAngle1() const;
 	D_NEWTON_API ndFloat32 GetOmega1() const;
@@ -58,11 +57,11 @@ class ndJointDoubleHinge: public ndJointBilateralConstraint
 	D_NEWTON_API void SetLimits1(ndFloat32 minLimit, ndFloat32 maxLimit);
 	D_NEWTON_API void GetLimits1(ndFloat32& minLimit, ndFloat32& maxLimit);
 	D_NEWTON_API void SetAsSpringDamper1(ndFloat32 regularizer, ndFloat32 spring, ndFloat32 damper);
+	D_NEWTON_API void GetSpringDamper1(ndFloat32& regularizer, ndFloat32& spring, ndFloat32& damper) const;
 
 	protected:
 	D_NEWTON_API void JacobianDerivative(ndConstraintDescritor& desc);
 	D_NEWTON_API ndFloat32 PenetrationOmega(ndFloat32 penetartion) const;
-	D_NEWTON_API void Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const;
 	D_NEWTON_API void DebugJoint(ndConstraintDebugCallback& debugCallback) const;
 	D_NEWTON_API void ApplyBaseRows(ndConstraintDescritor& desc, const ndMatrix& matrix0, const ndMatrix& matrix1);
 

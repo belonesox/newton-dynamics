@@ -22,12 +22,13 @@
 #include "ndCudaStdafx.h"
 #include "ndCudaUtils.h"
 #include "ndCudaDevice.h"
+#include "ndCudaSort.cuh"
 #include "ndCudaContext.h"
 #include "ndCudaPrefixScan.cuh"
-#include "ndCudaCountingSort.cuh"
 #include "ndCudaContextImplement.h"
 #include "ndCudaContextImplementInternal.cuh"
 
+#if 0
 #define D_CUDA_SCENE_GRID_SIZE		8.0f
 #define D_CUDA_SCENE_INV_GRID_SIZE	(1.0f/D_CUDA_SCENE_GRID_SIZE) 
 
@@ -308,7 +309,7 @@ __global__ void ndCudaInitBodyArray(ndCudaSceneInfo& info)
 		#endif
 		ndCudaMergeAabbInternal << <1, D_THREADS_PER_BLOCK, 0 >> > (info);
 
-		//cudaDeviceSynchronize();
+		m_device->SyncDevice();
 		info.m_histogram.m_size = bodyCount;
 		if (bodyCount > info.m_histogram.m_capacity)
 		{
@@ -417,3 +418,4 @@ __global__ void ndCudaInitTransforms(ndCudaSceneInfo& info)
 __global__ void ndCudaGenerateSceneGraph(ndCudaSceneInfo& info)
 {
 }
+#endif

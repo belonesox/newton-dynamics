@@ -30,8 +30,9 @@ class ndMultiBodyVehicle;
 class ndMultiBodyVehicleMotor: public ndJointBilateralConstraint
 {
 	public:
-	D_CLASS_REFLECTION(ndMultiBodyVehicleMotor);
-	D_NEWTON_API ndMultiBodyVehicleMotor(const ndLoadSaveBase::ndLoadDescriptor& desc);
+	D_CLASS_REFLECTION(ndMultiBodyVehicleMotor, ndJointBilateralConstraint)
+
+	D_NEWTON_API ndMultiBodyVehicleMotor();
 	D_NEWTON_API ndMultiBodyVehicleMotor(ndBodyKinematic* const motor, ndMultiBodyVehicle* const vehicelModel);
 
 	D_NEWTON_API ndFloat32 GetRpm() const;
@@ -39,12 +40,11 @@ class ndMultiBodyVehicleMotor: public ndJointBilateralConstraint
 	D_NEWTON_API void SetOmegaAccel(ndFloat32 rpmStep);
 	D_NEWTON_API void SetFrictionLoss(ndFloat32 newtonMeters);
 	D_NEWTON_API void SetTorqueAndRpm(ndFloat32 rpm, ndFloat32 newtonMeters);
+	void DebugJoint(ndConstraintDebugCallback&) const {}
 
 	private:
 	void AlignMatrix();
-	void DebugJoint(ndConstraintDebugCallback&) const {}
 	void JacobianDerivative(ndConstraintDescritor& desc);
-	void Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const;
 	ndFloat32 CalculateAcceleration(ndConstraintDescritor& desc);
 
 	protected:

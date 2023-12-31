@@ -27,20 +27,37 @@
 #define D_VEL_DAMP			 ndFloat32(100.0f)
 #define D_POS_DAMP			 ndFloat32(1500.0f)
 
-D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndJointBilateralConstraint)
-
-ndJointBilateralConstraint::ndJointBilateralConstraint(ndInt32 maxDof, ndBodyKinematic* const body0, ndBodyKinematic* const body1, const ndMatrix& globalMatrix)
+ndJointBilateralConstraint::ndJointBilateralConstraint()
 	:ndConstraint()
-	,m_forceBody0(ndVector::m_zero)
-	,m_torqueBody0(ndVector::m_zero)
-	,m_forceBody1(ndVector::m_zero)
-	,m_torqueBody1(ndVector::m_zero)
-	,m_body0(body0)
-	,m_body1(body1)
 	,m_worldNode(nullptr)
 	,m_body0Node(nullptr)
 	,m_body1Node(nullptr)
+	,m_deletedNode(nullptr)
 {
+	m_mark0 = 0;
+	m_mark1 = 0;
+	m_maxDof = 0;
+	m_rowIsMotor = 0;
+	m_isInSkeleton = 0;
+	m_enableCollision = 0;
+	m_solverModel = m_jointkinematicOpenLoop;
+	m_defualtDiagonalRegularizer = ndFloat32(0.0f);
+
+	//memset(m_jointForce, 0, sizeof(m_jointForce));
+	//memset(m_motorAcceleration, 0, sizeof(m_motorAcceleration));
+	ndMemSet(m_jointForce, ndForceImpactPair(), sizeof(m_jointForce) / sizeof(m_jointForce[0]));
+	ndMemSet(m_motorAcceleration, ndFloat32 (0.0f), sizeof(m_motorAcceleration) / sizeof (m_motorAcceleration[0]));
+}
+
+ndJointBilateralConstraint::ndJointBilateralConstraint(ndInt32 maxDof, ndBodyKinematic* const body0, ndBodyKinematic* const body1, const ndMatrix& globalMatrix)
+	:ndConstraint()
+	,m_worldNode(nullptr)
+	,m_body0Node(nullptr)
+	,m_body1Node(nullptr)
+	,m_deletedNode(nullptr)
+{
+	m_body0 = body0;
+	m_body1 = body1;
 	ndAssert(m_body0 && m_body1);
 	ndAssert(m_body0 != m_body1);
 
@@ -54,31 +71,30 @@ ndJointBilateralConstraint::ndJointBilateralConstraint(ndInt32 maxDof, ndBodyKin
 
 	m_mark0 = 0;
 	m_mark1	= 0;
-	m_maxDof = ndUnsigned32(maxDof);
+	//m_maxDof = ndUnsigned32(maxDof);
+	m_maxDof = ndUnsigned8(maxDof);
 	m_rowIsMotor = 0;
-	m_markedForRemoved = 0;
 	m_isInSkeleton = 0;
 	m_enableCollision = 0;
 	m_solverModel = m_jointkinematicOpenLoop;
 	m_defualtDiagonalRegularizer = ndFloat32(0.0f);
 	
-	memset(m_jointForce, 0, sizeof(m_jointForce));
-	memset(m_motorAcceleration, 0, sizeof(m_motorAcceleration));
+	//memset(m_jointForce, 0, sizeof(m_jointForce));
+	//memset(m_motorAcceleration, 0, sizeof(m_motorAcceleration));
+	ndMemSet(m_jointForce, ndForceImpactPair(), sizeof(m_jointForce) / sizeof(m_jointForce[0]));
+	ndMemSet(m_motorAcceleration, ndFloat32(0.0f), sizeof(m_motorAcceleration) / sizeof(m_motorAcceleration[0]));
 }
 
 ndJointBilateralConstraint::ndJointBilateralConstraint(ndInt32 maxDof, ndBodyKinematic* const body0,
 	ndBodyKinematic* const body1, const ndMatrix& globalMatrixBody0, const ndMatrix& globalMatrixBody1)
 	:ndConstraint()
-	,m_forceBody0(ndVector::m_zero)
-	,m_torqueBody0(ndVector::m_zero)
-	,m_forceBody1(ndVector::m_zero)
-	,m_torqueBody1(ndVector::m_zero)
-	,m_body0(body0)
-	,m_body1(body1)
 	,m_worldNode(nullptr)
 	,m_body0Node(nullptr)
 	,m_body1Node(nullptr)
+	,m_deletedNode(nullptr)
 {
+	m_body0 = body0;
+	m_body1 = body1;
 	ndAssert(m_body0 && m_body1);
 	ndAssert(m_body0 != m_body1);
 
@@ -94,54 +110,18 @@ ndJointBilateralConstraint::ndJointBilateralConstraint(ndInt32 maxDof, ndBodyKin
 
 	m_mark0 = 0;
 	m_mark1 = 0;
-	m_maxDof = ndUnsigned32(maxDof);
+	//m_maxDof = ndUnsigned32(maxDof);
+	m_maxDof = ndUnsigned8(maxDof);
 	m_rowIsMotor = 0;
-	m_markedForRemoved = 0;
 	m_isInSkeleton = 0;
 	m_enableCollision = 0;
 	m_solverModel = m_jointkinematicOpenLoop;
 	m_defualtDiagonalRegularizer = ndFloat32(0.0f);
 
-	memset(m_jointForce, 0, sizeof(m_jointForce));
-	memset(m_motorAcceleration, 0, sizeof(m_motorAcceleration));
-}
-
-ndJointBilateralConstraint::ndJointBilateralConstraint(const ndLoadSaveBase::ndLoadDescriptor& desc)
-	:ndConstraint()
-	,m_forceBody0(ndVector::m_zero)
-	,m_torqueBody0(ndVector::m_zero)
-	,m_forceBody1(ndVector::m_zero)
-	,m_torqueBody1(ndVector::m_zero)
-	,m_worldNode(nullptr)
-	,m_body0Node(nullptr)
-	,m_body1Node(nullptr)
-{
-	const nd::TiXmlNode* const xmlNode = desc.m_rootNode;
-	
-	m_mark0 = 0;
-	m_mark1 = 0;
-	m_rowIsMotor = 0;
-	m_markedForRemoved = 0;
-	m_isInSkeleton = 0;
-
-	ndInt32 body0Hash = xmlGetInt(xmlNode, "body0Hash");
-	ndInt32 body1Hash = xmlGetInt(xmlNode, "body1Hash");
-	ndBody* const body0 = (ndBody*)desc.m_bodyMap->Find(body0Hash)->GetInfo();
-	ndBody* const body1 = (ndBody*)desc.m_bodyMap->Find(body1Hash)->GetInfo();
-
-	m_body0 = body0->GetAsBodyKinematic();
-	m_body1 = body1->GetAsBodyKinematic();
-
-	m_localMatrix0 = xmlGetMatrix(xmlNode, "localMatrix0");
-	m_localMatrix1 = xmlGetMatrix(xmlNode, "localMatrix1");
-	
-	m_maxDof = ndUnsigned32(xmlGetInt(xmlNode, "maxDof"));
-	m_enableCollision = ndUnsigned32(xmlGetInt(xmlNode, "enableCollision"));
-	m_solverModel = ndJointBilateralSolverModel(xmlGetInt(xmlNode, "solverModel"));
-	m_defualtDiagonalRegularizer = xmlGetFloat(xmlNode, "defualtDiagonalRegularizer");
-
-	memset(m_jointForce, 0, sizeof(m_jointForce));
-	memset(m_motorAcceleration, 0, sizeof(m_motorAcceleration));
+	//memset(m_jointForce, 0, sizeof(m_jointForce));
+	//memset(m_motorAcceleration, 0, sizeof(m_motorAcceleration));
+	ndMemSet(m_jointForce, ndForceImpactPair(), sizeof(m_jointForce) / sizeof(m_jointForce[0]));
+	ndMemSet(m_motorAcceleration, ndFloat32(0.0f), sizeof(m_motorAcceleration) / sizeof(m_motorAcceleration[0]));
 }
 
 ndJointBilateralConstraint::~ndJointBilateralConstraint()
@@ -149,24 +129,7 @@ ndJointBilateralConstraint::~ndJointBilateralConstraint()
 	ndAssert(m_worldNode == nullptr);
 	ndAssert(m_body0Node == nullptr);
 	ndAssert(m_body1Node == nullptr);
-}
-
-void ndJointBilateralConstraint::Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
-{
-	nd::TiXmlElement* const childNode = new nd::TiXmlElement(ClassName());
-	desc.m_rootNode->LinkEndChild(childNode);
-	childNode->SetAttribute("hashId", desc.m_nodeNodeHash);
-
-	xmlSaveParam(childNode, "body0Hash", desc.m_body0NodeHash);
-	xmlSaveParam(childNode, "body1Hash", desc.m_body1NodeHash);
-
-	xmlSaveParam(childNode, "localMatrix0", m_localMatrix0);
-	xmlSaveParam(childNode, "localMatrix1", m_localMatrix1);
-
-	xmlSaveParam(childNode, "defualtDiagonalRegularizer", m_defualtDiagonalRegularizer);
-	xmlSaveParam(childNode, "maxDof", ndInt32(m_maxDof));
-	xmlSaveParam(childNode, "enableCollision", ndInt32(m_enableCollision));
-	xmlSaveParam(childNode, "solverModel", ndInt32(m_solverModel));
+	ndAssert(m_deletedNode == nullptr);
 }
 
 void ndJointBilateralConstraint::SetIkMode(bool)
@@ -198,8 +161,8 @@ ndFloat32 ndJointBilateralConstraint::CalculateAngle(const ndVector& pin, const 
 void ndJointBilateralConstraint::CalculateLocalMatrix(const ndMatrix& globalMatrix, ndMatrix& localMatrix0, ndMatrix& localMatrix1) const
 {
 	ndAssert(globalMatrix.TestOrthogonal());
-	localMatrix0 = globalMatrix * m_body0->GetMatrix().Inverse();
-	localMatrix1 = globalMatrix * m_body1->GetMatrix().Inverse();
+	localMatrix0 = globalMatrix * m_body0->GetMatrix().OrthoInverse();
+	localMatrix1 = globalMatrix * m_body1->GetMatrix().OrthoInverse();
 }
 
 ndFloat32 ndJointBilateralConstraint::CalculateSpringDamperAcceleration(ndFloat32 dt, ndFloat32 ks, ndFloat32 x, ndFloat32 kd, ndFloat32 v) const
@@ -315,23 +278,26 @@ void ndJointBilateralConstraint::AddLinearRowJacobian(ndConstraintDescritor& des
 	m_rowIsMotor &= ~(1 << index);
 	m_motorAcceleration[index] = ndFloat32(0.0f);
 	ndAssert(desc.m_timestep > ndFloat32(0.0f));
+	ndForceImpactPair* const jointForce = &m_jointForce[index];
 
 	const ndVector& omega0 = m_body0->m_omega;
 	const ndVector& omega1 = m_body1->m_omega;
+	const ndVector& veloc0 = m_body0->m_veloc;
+	const ndVector& veloc1 = m_body1->m_veloc;
+
 	const ndVector gyroAlpha0(m_body0->GetGyroAlpha());
 	const ndVector gyroAlpha1(m_body1->GetGyroAlpha());
 	const ndVector centripetal0(omega0.CrossProduct(omega0.CrossProduct(m_r0[index])));
 	const ndVector centripetal1(omega1.CrossProduct(omega1.CrossProduct(m_r1[index])));
-
-	ndForceImpactPair* const jointForce = &m_jointForce[index];
-
-	const ndVector& veloc0 = m_body0->m_veloc;
-	const ndVector& veloc1 = m_body1->m_veloc;
-	const ndVector positError(param.m_posit1 - param.m_posit0);
-	ndFloat32 relPosit = positError.DotProduct(dir).GetScalar();
+	
+	//const ndVector positError(param.m_posit1 - param.m_posit0);
+	//ndFloat32 relPosit = positError.DotProduct(dir).GetScalar();
+	//ndFloat32 relPosit___ = -(jacobian0.m_linear * param.m_posit0 + jacobian1.m_linear * param.m_posit1).AddHorizontal().GetScalar();
+	//ndAssert(ndAbs (relPosit___ - relPosit) < ndFloat32(1.0e-7f));
 
 	const ndFloat32 relGyro = (jacobian0.m_angular * gyroAlpha0 + jacobian1.m_angular * gyroAlpha1).AddHorizontal().GetScalar();
 	const ndFloat32 relCentr = -(jacobian0.m_linear * centripetal0 + jacobian1.m_linear * centripetal1).AddHorizontal().GetScalar();
+	const ndFloat32 relPosit = -(jacobian0.m_linear * param.m_posit0 + jacobian1.m_linear * param.m_posit1).AddHorizontal().GetScalar();
 	const ndFloat32 relVeloc = -(jacobian0.m_linear * veloc0 + jacobian0.m_angular * omega0 + jacobian1.m_linear * veloc1 + jacobian1.m_angular * omega1).AddHorizontal().GetScalar();
 
 	//at =  [- ks (x2 - x1) - kd * (v2 - v1) - dt * ks * (v2 - v1)] / [1 + dt * kd + dt * dt * ks] 
@@ -347,6 +313,7 @@ void ndJointBilateralConstraint::AddLinearRowJacobian(ndConstraintDescritor& des
 	desc.m_flags[index] = 0;
 	desc.m_jointAccel[index] = relAccel;
 	desc.m_penetration[index] = relPosit;
+	desc.m_jointSpeed[index] = relVeloc;
 	desc.m_restitution[index] = ndFloat32(0.0f);
 	desc.m_penetrationStiffness[index] = ndFloat32(0.0f);
 	desc.m_forceBounds[index].m_jointForce = jointForce;
@@ -399,6 +366,7 @@ void ndJointBilateralConstraint::AddAngularRowJacobian(ndConstraintDescritor& de
 	ndFloat32 alphaError = num / den;
 
 	desc.m_flags[index] = 0;
+	desc.m_jointSpeed[index] = relOmega;
 	desc.m_penetration[index] = relAngle;
 	desc.m_jointAccel[index] = alphaError + relGyro;
 	desc.m_restitution[index] = ndFloat32(0.0f);

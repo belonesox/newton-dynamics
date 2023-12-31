@@ -9,12 +9,11 @@
 * freely
 */
 
-#ifndef __D_VEHICLE_COMMON_UTIL__
-#define __D_VEHICLE_COMMON_UTIL__
+#ifndef __ND_VEHICLE_COMMON_UTIL__
+#define __ND_VEHICLE_COMMON_UTIL__
 
 #include "ndSandboxStdafx.h"
 #include "ndDemoEntity.h"
-#include "ndContactCallback.h"
 #include "ndDemoEntityNotify.h"
 #include "ndGameControlerInputs.h"
 
@@ -195,7 +194,7 @@ class ndVehicleCommon : public ndMultiBodyVehicle
 		m_clutch = ndGameControllerInputs::m_azis_03,
 	};
 
-	D_CLASS_REFLECTION(ndVehicleCommon);
+	D_CLASS_REFLECTION(ndVehicleCommon, ndMultiBodyVehicle)
 
 	ndVehicleCommon(const ndVehicleDectriptor& desc);
 	virtual ~ndVehicleCommon();
@@ -236,13 +235,14 @@ class ndVehicleCommon : public ndMultiBodyVehicle
 class ndVehicleSelector : public ndModel
 {
 	public:
-	D_CLASS_REFLECTION(ndVehicleSelector);
+	D_CLASS_REFLECTION(ndVehicleSelector, ndModel)
 	ndVehicleSelector();
-	ndVehicleSelector(const ndLoadSaveBase::ndLoadDescriptor& desc);
+
+	virtual void OnAddToWorld() {}
+	virtual void OnRemoveFromToWorld() {}
 
 	void Update(ndWorld* const, ndFloat32){}
 	void PostUpdate(ndWorld* const world, ndFloat32);
-	void Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const;
 
 	void SelectNext(ndWorld* const world);
 

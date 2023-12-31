@@ -106,8 +106,7 @@ class ndIsoSurfaceParticleVolume : public ndBodySphFluid
 	{
 		D_TRACKTIME();
 		ndArray<ndVector>& pointCloud = GetPositions();
-		ndFloat32 gridSpacing = GetSphGridSize();
-		//gridSpacing *= 1.0f;
+		ndFloat32 gridSpacing = 2.0f * GetParticleRadius();
 		m_isoSurface.GenerateMesh(pointCloud, gridSpacing);
 
 #if 1
@@ -178,6 +177,8 @@ class ndWaterVolumeEntity : public ndDemoEntity
 	ndWaterVolumeEntity(ndDemoEntityManager* const scene, const ndMatrix& location, const ndVector&, ndIsoSurfaceParticleVolume* const fluidBody)
 		:ndDemoEntity(location, nullptr)
 		,m_fluidBody(fluidBody)
+		,m_isoSurfaceMesh0()
+		,m_isoSurfaceMesh1()
 	{
 		ndShapeInstance box(new ndShapeBox(9.0f, 10.0f, 9.0f));
 		ndMatrix uvMatrix(ndGetIdentityMatrix());
@@ -209,7 +210,7 @@ class ndWaterVolumeEntity : public ndDemoEntity
 		{
 			ndScopeSpinLock lock(m_lock);
 
-			if (m_fluidBody->taskState() == ndBackgroundTask::m_taskCompleted)
+			if (m_fluidBody->TaskState() == ndBackgroundTask::m_taskCompleted)
 			{
 				m_fluidBody->m_meshIsReady.store(0);
 				const ndArray<ndInt32>& indexList = m_fluidBody->m_indexList;
@@ -265,25 +266,29 @@ class ndWaterVolumeCallback: public ndDemoEntityNotify
 
 static void BuildBox(const ndMatrix& matrix, ndIsoSurfaceParticleVolume* const surface, ndInt32 size)
 {
-	ndFloat32 spacing = surface->GetSphGridSize();
+	ndFloat32 spacing = 2.0f * surface->GetParticleRadius();
 	ndArray<ndVector>& veloc = surface->GetVelocity();
 	ndArray<ndVector>& posit = surface->GetPositions();
 
+spacing *= 0.9f;
 	ndVector v(ndVector::m_zero);
 	for (ndInt32 z = 0; z < size; z++)
+	//for (ndInt32 z = 0; z < 1; z++)
 	{
-		for (ndInt32 y = 0; y < size; y++)
+		//for (ndInt32 y = 0; y < size; y++)
+		for (ndInt32 y = 0; y < 1; y++)
 		{
-			for (ndInt32 x = 0; x < size; x++)
+			//for (ndInt32 x = 0; x < size; x++)
+			for (ndInt32 x = 0; x < 1; x++)
 			{
 				ndVector p(matrix.TransformVector(ndVector((ndFloat32)x * spacing, (ndFloat32)y * spacing, (ndFloat32)z * spacing, ndFloat32(1.0f))));
 				p.m_x = spacing * (ndFloat32)ndInt32(p.m_x / spacing);
 				p.m_y = spacing * (ndFloat32)ndInt32(p.m_y / spacing);
 				p.m_z = spacing * (ndFloat32)ndInt32(p.m_z / spacing);
 
-				p.m_x += ndGaussianRandom(0.0f, spacing * 0.01f);
-				p.m_y += ndGaussianRandom(0.0f, spacing * 0.01f);
-				p.m_z += ndGaussianRandom(0.0f, spacing * 0.01f);
+				//p.m_x += ndGaussianRandom(0.0f, spacing * 0.01f);
+				//p.m_y += ndGaussianRandom(0.0f, spacing * 0.01f);
+				//p.m_z += ndGaussianRandom(0.0f, spacing * 0.01f);
 				posit.PushBack(p);
 				veloc.PushBack(v);
 			}
@@ -293,7 +298,7 @@ static void BuildBox(const ndMatrix& matrix, ndIsoSurfaceParticleVolume* const s
 
 static void BuildHollowBox(const ndMatrix& matrix, ndIsoSurfaceParticleVolume* const surface, ndInt32 size)
 {
-	ndFloat32 spacing = surface->GetSphGridSize();
+	ndFloat32 spacing = 2.0f * surface->GetParticleRadius();
 	ndArray<ndVector>& veloc = surface->GetVelocity();
 	ndArray<ndVector>& posit = surface->GetPositions();
 
@@ -322,7 +327,7 @@ static void BuildHollowBox(const ndMatrix& matrix, ndIsoSurfaceParticleVolume* c
 
 static void BuildSphere(const ndMatrix& matrix, ndIsoSurfaceParticleVolume* const surface, ndInt32 size)
 {
-	ndFloat32 spacing = surface->GetSphGridSize();
+	ndFloat32 spacing = 2.0f * surface->GetParticleRadius();
 	ndArray<ndVector>& veloc = surface->GetVelocity();
 	ndArray<ndVector>& posit = surface->GetPositions();
 
@@ -361,7 +366,8 @@ static void AddWaterVolume(ndDemoEntityManager* const scene, const ndMatrix& loc
 
 	//ndFloat32 diameter = 0.25f;
 	//ndFloat32 diameter = 0.15f;
-	ndFloat32 diameter = 0.125f;
+	//ndFloat32 diameter = 0.125f;
+	ndFloat32 diameter = 1.0f;
 	ndIsoSurfaceParticleVolume* const fluidObject = new ndIsoSurfaceParticleVolume(diameter * 0.5f);
 	ndWaterVolumeEntity* const entity = new ndWaterVolumeEntity(scene, matrix, ndVector(20.0f, 10.0f, 20.0f, 0.0f), fluidObject);
 
@@ -369,11 +375,15 @@ static void AddWaterVolume(ndDemoEntityManager* const scene, const ndMatrix& loc
 	fluidObject->SetMatrix(matrix);
 	fluidObject->SetParticleRadius(diameter * 0.5f);
 	
-	//ndInt32 particleCountPerAxis = 64;
-	//ndInt32 particleCountPerAxis = 40;
-	//ndInt32 particleCountPerAxis = 32;
+	//ndInt32 particleCountPerAxis = 1;
+	//ndInt32 particleCountPerAxis = 2;
+	//ndInt32 particleCountPerAxis = 3;
+	ndInt32 particleCountPerAxis = 4;
+	//ndInt32 particleCountPerAxis = 8;
 	//ndInt32 particleCountPerAxis = 10;
-	ndInt32 particleCountPerAxis = 40;
+	//ndInt32 particleCountPerAxis = 32;
+	//ndInt32 particleCountPerAxis = 40;
+	//ndInt32 particleCountPerAxis = 64;
 	ndFloat32 spacing = diameter;
 	
 	ndFloat32 offset = spacing * (ndFloat32)particleCountPerAxis / 2.0f;

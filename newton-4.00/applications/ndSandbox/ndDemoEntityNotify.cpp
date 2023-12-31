@@ -15,85 +15,44 @@
 #include "ndPhysicsWorld.h"
 #include "ndDemoEntityNotify.h"
 
-D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndDemoEntityNotify)
-D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndBindingRagdollEntityNotify)
-
 ndDemoEntityNotify::ndDemoEntityNotify(ndDemoEntityManager* const manager, ndDemoEntity* const entity, ndBodyKinematic* const parentBody, ndFloat32 gravity)
-	:ndBodyNotify(ndVector (ndFloat32 (0.0f), gravity, ndFloat32(0.0f), ndFloat32(0.0f)))
+	:ndModelNotify(parentBody, ndVector(0.0f, gravity, 0.0f, 0.0f))
 	,m_entity(entity)
-	,m_parentBody(parentBody)
 	,m_manager(manager)
 {
-}
-
-// member a fill in a post process pass
-ndDemoEntityNotify::ndDemoEntityNotify(const ndLoadSaveBase::ndLoadDescriptor& desc)
-	:ndBodyNotify(ndLoadSaveBase::ndLoadDescriptor(desc))
-	,m_entity(nullptr)
-	,m_parentBody(nullptr)
-	,m_manager(nullptr)
-{
-//	const nd::TiXmlNode* const rootNode = desc.m_rootNode;
-// remember to save member below
+	//static ndDemoEntityNotifyFileLoadSave registerClass;
 }
 
 ndDemoEntityNotify::~ndDemoEntityNotify()
 {
-	if (m_entity && m_entity->m_rootNode)
+	if (m_entity)
 	{
-		m_manager->GetWorld()->RemoveEntity(m_entity);
+		if (m_entity->m_rootNode)
+		{
+			m_manager->GetWorld()->RemoveEntity(m_entity);
+		}
+		else
+		{
+			// it is a child mesh, probably and instance
+			delete m_entity;
+		}
 	}
 }
 
-void ndDemoEntityNotify::Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
-{
-	nd::TiXmlElement* const childNode = new nd::TiXmlElement(ClassName());
-	desc.m_rootNode->LinkEndChild(childNode);
-	ndBodyNotify::Save(ndLoadSaveBase::ndSaveDescriptor(desc, childNode));
-	xmlSaveParam(childNode, "comment", "string", "body notification for Newton 4.0 demos");
-
-	// remember to save member below
-	//ndDemoEntity* m_entity;
-	//ndBodyDynamic* m_parentBody;
-	//ndDemoEntityManager* m_manager;
-}
-
-void ndDemoEntityNotify::OnObjectPick() const
-{
-	ndTrace(("picked body id: %d\n", GetBody()->GetId()));
-}
-
-void ndDemoEntityNotify::OnApplyExternalForce(ndInt32, ndFloat32)
-{
-	ndBodyKinematic* const body = GetBody()->GetAsBodyKinematic();
-	ndAssert(body);
-	if (body->GetInvMass() > 0.0f)
-	{
-		ndVector massMatrix(body->GetMassMatrix());
-		ndVector force(GetGravity().Scale(massMatrix.m_w));
-		body->SetForce(force);
-		body->SetTorque(ndVector::m_zero);
-	}
-}
+//void ndDemoEntityNotify::OnObjectPick() const
+//{
+//	ndTrace(("picked body id: %d\n", GetBody()->GetId()));
+//}
 
 void ndDemoEntityNotify::OnTransform(ndInt32, const ndMatrix& matrix)
 {
 	// apply this transformation matrix to the application user data.
 	if (m_entity)
 	{
-		const ndBody* const body = GetBody();
-		if (!m_parentBody)
-		{
-			const ndQuaternion rot(body->GetRotation());
-			m_entity->SetMatrix(rot, matrix.m_posit);
-		}
-		else
-		{
-			const ndMatrix parentMatrix(m_parentBody->GetMatrix());
-			const ndMatrix localMatrix(matrix * parentMatrix.Inverse());
-			const ndQuaternion rot(localMatrix);
-			m_entity->SetMatrix(rot, localMatrix.m_posit);
-		}
+		ndVector posit;
+		ndQuaternion rot;
+		CalculateMatrix(matrix, rot, posit);
+		m_entity->SetMatrix(rot, posit);
 	}
 
 	if (!CheckInWorld(matrix))
@@ -115,24 +74,24 @@ ndBindingRagdollEntityNotify::ndBindingRagdollEntityNotify(ndDemoEntityManager* 
 	,m_bindMatrix(ndGetIdentityMatrix())
 	,m_capSpeed(capSpeed)
 {
+	//static ndBindingRagdollEntityNotifyFileSaveLoad registerClass;
 	ndDemoEntity* const parentEntity = m_parentBody ? (ndDemoEntity*)(parentBody->GetNotifyCallback()->GetUserData()) : nullptr;
-	m_bindMatrix = entity->GetParent()->CalculateGlobalMatrix(parentEntity).Inverse();
+	m_bindMatrix = entity->GetParent()->CalculateGlobalMatrix(parentEntity).OrthoInverse();
 }
 
-ndBindingRagdollEntityNotify::ndBindingRagdollEntityNotify(const ndLoadSaveBase::ndLoadDescriptor& desc)
-	:ndDemoEntityNotify(ndLoadSaveBase::ndLoadDescriptor(desc))
-	,m_bindMatrix(nullptr)
-	,m_capSpeed(0.0f)
+ndBindingRagdollEntityNotify::~ndBindingRagdollEntityNotify()
 {
-	ndAssert(0);
-}
-
-void ndBindingRagdollEntityNotify::Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
-{
-	ndAssert(0);
-	nd::TiXmlElement* const childNode = new nd::TiXmlElement(ClassName());
-	desc.m_rootNode->LinkEndChild(childNode);
-	ndBodyNotify::Save(ndLoadSaveBase::ndSaveDescriptor(desc, childNode));
+	if (m_entity)
+	{
+		if (m_entity->GetParent())
+		{
+			m_entity = nullptr;
+		}
+		else
+		{
+			ndAssert(0);
+		}
+	}
 }
 
 void ndBindingRagdollEntityNotify::OnTransform(ndInt32, const ndMatrix& matrix)
@@ -146,7 +105,7 @@ void ndBindingRagdollEntityNotify::OnTransform(ndInt32, const ndMatrix& matrix)
 	else
 	{
 		const ndMatrix parentMatrix(m_parentBody->GetMatrix());
-		const ndMatrix localMatrix(matrix * parentMatrix.Inverse() * m_bindMatrix);
+		const ndMatrix localMatrix(matrix * parentMatrix.OrthoInverse() * m_bindMatrix);
 		const ndQuaternion rot(localMatrix);
 		m_entity->SetMatrix(rot, localMatrix.m_posit);
 	}
@@ -165,7 +124,7 @@ void ndBindingRagdollEntityNotify::OnApplyExternalForce(ndInt32 thread, ndFloat3
 	ndBodyKinematic* const body = GetBody()->GetAsBodyKinematic();
 	ndAssert(body && body->GetInvMass() > 0.0f);
 
-	// clamp execive velocites.
+	// clamp excessive velocities.
 	ndVector omega(body->GetOmega());
 	ndVector veloc(body->GetVelocity());
 	ndFloat32 omega2(omega.DotProduct(omega).GetScalar());

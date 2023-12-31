@@ -106,7 +106,6 @@ class ndShapeInstance: public ndContainersFreeListAlloc<ndShapeInstance>
 	D_COLLISION_API ndShapeInstance(ndShape* const shape);
 	D_COLLISION_API ndShapeInstance(const ndShapeInstance& instance);
 	D_COLLISION_API ndShapeInstance(const ndShapeInstance& instance, ndShape* const shape);
-	D_COLLISION_API ndShapeInstance(const nd::TiXmlNode* const xmlNode, const ndShapeLoaderCache& shapesMap);
 	D_COLLISION_API ~ndShapeInstance();
 
 	D_COLLISION_API ndShapeInstance& operator=(const ndShapeInstance& src);
@@ -120,12 +119,15 @@ class ndShapeInstance: public ndContainersFreeListAlloc<ndShapeInstance>
 	//D_COLLISION_API ndInt32 ClosestPoint(const ndMatrix& matrix, const ndVector& point, ndVector& contactPoint) const;
 
 	D_COLLISION_API ndShapeInfo GetShapeInfo() const;
-	D_COLLISION_API void Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const;
 	D_COLLISION_API ndFloat32 CalculateBuoyancyCenterOfPresure(ndVector& com, const ndMatrix& matrix, const ndVector& fluidPlane) const;
 
-	D_COLLISION_API static ndVector GetBoxPadding();
+	D_COLLISION_API static ndFloat32 GetBoxPadding();
 
 	D_COLLISION_API void SavePLY(const char* const fileName) const;
+
+	const char* ClassName() const;
+	static const char* StaticClassName();
+	const char* SuperClassName() const;
 	
 	ndShape* GetShape();
 	const ndShape* GetShape() const;
@@ -395,6 +397,22 @@ inline void ndShapeInstance::SetShape(ndShape* const shape)
 	}
 	m_shape = shape ? shape->AddRef() : shape;
 }
+
+inline const char* ndShapeInstance::ClassName() const 
+{ 
+	return "ndShapeInstance"; 
+}
+
+inline const char* ndShapeInstance::StaticClassName() 
+{ 
+	return "ndShapeInstance"; 
+}
+
+inline const char* ndShapeInstance::SuperClassName() const 
+{ 
+	return "ndShapeInstance"; 
+}
+
 #endif 
 
 

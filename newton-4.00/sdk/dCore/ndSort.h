@@ -28,6 +28,31 @@
 #include "ndThreadPool.h"
 
 template <class T, class dCompareKey>
+void ndSort(T* const array, ndInt32 elements, void* const context);
+
+template <class T, class ndEvaluateKey, ndInt32 keyBitSize>
+void ndCountingSort(const T* const srcArray, T* const dstArray, ndInt32 size, ndUnsigned32* const prefixScanOut, void* const context);
+
+template <class T, class ndEvaluateKey, ndInt32 keyBitSize>
+void ndCountingSort(ndThreadPool& threadPool, const T* const srcArray, T* const dstArray, ndInt32 size, ndUnsigned32* const prefixScanOut, void* const context);
+
+template <class T, class ndEvaluateKey, ndInt32 keyBitSize>
+void ndCountingSort(ndArray<T>& array, ndArray<T>& scratchBuffer, ndUnsigned32* const prefixScanOut, void* const context);
+
+template <class T, class ndEvaluateKey, ndInt32 keyBitSize>
+void ndCountingSort(ndThreadPool& threadPool, ndArray<T>& array, ndArray<T>& scratchBuffer, ndUnsigned32* const prefixScanOut, void* const context);
+
+template <class T, class ndEvaluateKey, ndInt32 keyBitSize>
+void ndCountingSortInPlace(T* const array, T* const scratchBuffer, ndInt32 size, ndUnsigned32* const prefixScanOut, void* const context);
+
+template <class T, class ndEvaluateKey, ndInt32 keyBitSize>
+void ndCountingSortInPlace(ndThreadPool& threadPool, T* const array, T* const scratchBuffer, ndInt32 size, ndUnsigned32* const prefixScanOut, void* const context);
+
+
+// *****************************************************
+// Implementation 
+// *****************************************************
+template <class T, class dCompareKey>
 void ndSort(T* const array, ndInt32 elements, void* const context)
 {
 	//D_TRACKTIME();
@@ -243,35 +268,28 @@ void ndCountingSortInPlace(ndThreadPool& threadPool, T* const array, T* const sc
 
 	threadPool.ParallelExecute(ndBuildHistogram);
 
-	ndInt32 bits = keyBitSize;
-	if (bits < 11)
+	ndAssert(keyBitSize < 11);
+	for (ndInt32 i = 0; i < (1 << keyBitSize); ++i)
 	{
+		sum[i] = 0;
+	}
+	for (ndInt32 j = 0; j < threadCount; ++j)
+	{
+		ndUnsigned32* const scan = &scans[j * (1 << keyBitSize)];
 		for (ndInt32 i = 0; i < (1 << keyBitSize); ++i)
 		{
-			sum[i] = 0;
-		}
-		for (ndInt32 j = 0; j < threadCount; ++j)
-		{
-			ndUnsigned32* const scan = &scans[j * (1 << keyBitSize)];
-			for (ndInt32 i = 0; i < (1 << keyBitSize); ++i)
-			{
-				ndUnsigned32 partialSum = scan[i];
-				scan[i] = sum[i];
-				sum[i] += partialSum;
-			}
-		}
-
-		ndUnsigned32 accSum = 0;
-		for (ndInt32 i = 0; i < (1 << keyBitSize); ++i)
-		{
-			ndUnsigned32 partialSum = sum[i];
-			sum[i] = accSum;
-			accSum += partialSum;
+			ndUnsigned32 partialSum = scan[i];
+			scan[i] = sum[i];
+			sum[i] += partialSum;
 		}
 	}
-	else
+
+	ndUnsigned32 accSum = 0;
+	for (ndInt32 i = 0; i < (1 << keyBitSize); ++i)
 	{
-		ndAssert(0);
+		ndUnsigned32 partialSum = sum[i];
+		sum[i] = accSum;
+		accSum += partialSum;
 	}
 
 	if (prefixScanOut)
@@ -408,35 +426,28 @@ void ndCountingSort(ndThreadPool& threadPool, const T* const srcArray, T* const 
 
 	threadPool.ParallelExecute(ndBuildHistogram);
 
-	ndInt32 bits = keyBitSize;
-	if (bits < 11)
+	ndAssert(keyBitSize < 11);
+	for (ndInt32 i = 0; i < (1 << keyBitSize); ++i)
 	{
+		sum[i] = 0;
+	}
+	for (ndInt32 j = 0; j < threadCount; ++j)
+	{
+		ndUnsigned32* const scan = &scans[j * (1 << keyBitSize)];
 		for (ndInt32 i = 0; i < (1 << keyBitSize); ++i)
 		{
-			sum[i] = 0;
-		}
-		for (ndInt32 j = 0; j < threadCount; ++j)
-		{
-			ndUnsigned32* const scan = &scans[j * (1 << keyBitSize)];
-			for (ndInt32 i = 0; i < (1 << keyBitSize); ++i)
-			{
-				ndUnsigned32 partialSum = scan[i];
-				scan[i] = sum[i];
-				sum[i] += partialSum;
-			}
-		}
-
-		ndUnsigned32 accSum = 0;
-		for (ndInt32 i = 0; i < (1 << keyBitSize); ++i)
-		{
-			ndUnsigned32 partialSum = sum[i];
-			sum[i] = accSum;
-			accSum += partialSum;
+			ndUnsigned32 partialSum = scan[i];
+			scan[i] = sum[i];
+			sum[i] += partialSum;
 		}
 	}
-	else
+
+	ndUnsigned32 accSum = 0;
+	for (ndInt32 i = 0; i < (1 << keyBitSize); ++i)
 	{
-		ndAssert(0);
+		ndUnsigned32 partialSum = sum[i];
+		sum[i] = accSum;
+		accSum += partialSum;
 	}
 
 	if (prefixScanOut)

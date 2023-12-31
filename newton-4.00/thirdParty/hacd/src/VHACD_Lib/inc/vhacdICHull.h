@@ -15,9 +15,14 @@
 #pragma once
 #ifndef ND_VHACD_ICHULL_H
 #define ND_VHACD_ICHULL_H
-#include <cstdint>
+
+#include "vhacdDefines.h"
 #include "vhacdManifoldMesh.h"
 #include "vhacdVector.h"
+
+#if (defined (__linux__ ) || defined (__MINGW32__) || defined (__MINGW64__))
+	#include <unistd.h>
+#endif
 
 namespace nd_
 {
@@ -56,7 +61,7 @@ namespace nd_
 			//!    Constructor
 			ICHull();
 			//! Destructor
-			~ICHull(void) {};
+			~ICHull(void) {}
 
 			private:
 			//!    DoubleTriangle builds the initial double triangle.  It first finds 3 noncollinear points and makes two faces out of them, in opposite order. It then finds a fourth point that is not coplanar with that face.  The vertices are stored in the face structure in counterclockwise order so that the volume between the face and the point is negative. Lastly, the 3 newfaces to the fourth point are constructed and the data structures are cleaned up.

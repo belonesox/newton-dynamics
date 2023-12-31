@@ -21,30 +21,26 @@ file(GLOB CPP_SOURCE
 	demos/*.cpp
 	toolbox/*.h
 	toolbox/*.cpp 
-	animation/*.h
-	animation/*.cpp 
 )
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/" FILES ${CPP_SOURCE})
 
 include_directories(.)
 include_directories(toolbox)
-include_directories(animation)
 include_directories(../../sdk/dCore)
+include_directories(../../sdk/dBrain)
+include_directories(../../sdk/dModel)
 include_directories(../../sdk/dNewton)
-include_directories(../../sdk/dTinyxml)
 include_directories(../../sdk/dCollision)
+include_directories(../../sdk/dFileFormat)
 include_directories(../../sdk/dNewton/dJoints)
 include_directories(../../sdk/dNewton/dModels)
 include_directories(../../sdk/dNewton/dIkSolver)
-include_directories(../../sdk/dNewton/dParticles)
 include_directories(../../sdk/dNewton/dModels/dVehicle)
-include_directories(../../sdk/dNewton/dModels/dCharacter)
 
-include_directories(../../thirdParty/brain)
 include_directories(../../thirdParty/glfw/)
 include_directories(../../thirdParty/imgui/)
-include_directories(../../thirdParty/hacdNew)
+include_directories(../../thirdParty/tinyxml/)
 include_directories(../../thirdParty/openFBX/src/)
 include_directories(../../thirdParty/glfw/include/)
 include_directories(../../thirdParty/imgui/backends)
@@ -54,7 +50,7 @@ include_directories(../../thirdParty/openalRuntime/win32sdk/include)
 
 add_executable(${projectName} ${CPP_SOURCE})
 
-target_link_libraries (${projectName} ndNewton ndBrain vhacd openfbx glfw imgui glatter)
+target_link_libraries (${projectName} ndNewton ndBrain ndModel ndFileFormat ndTinyxml vhacd openfbx glfw imgui glatter)
 
 if (NEWTON_BUILD_CREATE_SUB_PROJECTS)
 	target_link_libraries (${projectName} ndCollision ndCore)
@@ -78,17 +74,11 @@ if(MSVC OR MINGW)
 		endif()
 	endif(NEWTON_ENABLE_CUDA_SOLVER)
 
-	if (NEWTON_ENABLE_OPENCL_SOLVER)
+	if (NEWTON_ENABLE_SYCL_SOLVER)
 		if (NOT NEWTON_BUILD_SHARED_LIBS)
-			target_link_libraries (${projectName} ndSolverOpenCL)
-			if (PTR_SIZE EQUAL 8)
-				message (${CMAKE_CURRENT_SOURCE_DIR})
-				target_link_libraries (${projectName} "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/dNewton/dExtensions/dOpencl/CL/lib/x64/OpenCL.lib")
-			else()
-				target_link_libraries (${projectName} "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/dNewton/dExtensions/dOpencl/CL/lib/x64/OpenCL.lib")
-			endif()
+			target_link_libraries (${projectName} ndSolverSycl)
 		endif()
-	endif(NEWTON_ENABLE_OPENCL_SOLVER)
+	endif(NEWTON_ENABLE_SYCL_SOLVER)
 
 	if (PTR_SIZE EQUAL 8)
 		target_link_libraries (${projectName} ${CMAKE_SOURCE_DIR}/thirdParty/openalRuntime/win64sdk/lib/OpenAL_32.lib)
@@ -125,10 +115,10 @@ if(UNIX)
 	if (NEWTON_ENABLE_CUDA_SOLVER)
 		target_link_libraries (${projectName} ndSolverCuda)
 	endif(NEWTON_ENABLE_CUDA_SOLVER)
-	
-	if (NEWTON_ENABLE_OPENCL_SOLVER)
-		target_link_libraries (${projectName} ndSolverOpenCL OpenCL)
-	endif(NEWTON_ENABLE_OPENCL_SOLVER)
+
+	if (NEWTON_ENABLE_SYCL_SOLVER)
+		target_link_libraries (${projectName} ndSolverSycl)
+	endif(NEWTON_ENABLE_SYCL_SOLVER)
     
     set (source "${CMAKE_SOURCE_DIR}/applications/media")
     set (destination "${PROJECT_BINARY_DIR}/applications/media")

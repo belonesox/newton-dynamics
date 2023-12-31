@@ -13,7 +13,13 @@
 #include "ndNewtonStdafx.h"
 #include "ndJointDryRollingFriction.h"
 
-D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndJointDryRollingFriction)
+ndJointDryRollingFriction::ndJointDryRollingFriction()
+	:ndJointBilateralConstraint()
+	,m_coefficient(ndFloat32(0.5f))
+	,m_contactTrail(ndFloat32(0.1f))
+{
+	m_maxDof = 1;
+}
 
 ndJointDryRollingFriction::ndJointDryRollingFriction(ndBodyKinematic* const body0, ndBodyKinematic* const body1, ndFloat32 coefficient)
 	:ndJointBilateralConstraint(1, body0, body1, ndGetIdentityMatrix())
@@ -26,29 +32,30 @@ ndJointDryRollingFriction::ndJointDryRollingFriction(ndBodyKinematic* const body
 	SetSolverModel(m_jointIterativeSoft);
 }
 
-ndJointDryRollingFriction::ndJointDryRollingFriction(const ndLoadSaveBase::ndLoadDescriptor& desc)
-	:ndJointBilateralConstraint(ndLoadSaveBase::ndLoadDescriptor(desc))
-{
-	const nd::TiXmlNode* const xmlNode = desc.m_rootNode;
-
-	m_coefficient = xmlGetFloat(xmlNode, "coefficient");
-	m_contactTrail = xmlGetFloat(xmlNode, "contactTrail");
-}
-
 ndJointDryRollingFriction::~ndJointDryRollingFriction()
 {
 }
 
-void ndJointDryRollingFriction::Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
+void ndJointDryRollingFriction::SetContactTrail(ndFloat32 trail)
 {
-	nd::TiXmlElement* const childNode = new nd::TiXmlElement(ClassName());
-	desc.m_rootNode->LinkEndChild(childNode);
-	childNode->SetAttribute("hashId", desc.m_nodeNodeHash);
-	ndJointBilateralConstraint::Save(ndLoadSaveBase::ndSaveDescriptor(desc, childNode));
-
-	xmlSaveParam(childNode, "coefficient", m_coefficient);
-	xmlSaveParam(childNode, "contactTrail", m_contactTrail);
+	m_contactTrail = ndClamp(trail, ndFloat32(0.1f), ndFloat32(1.0f));
 }
+
+void ndJointDryRollingFriction::SetFrictionCoefficient(ndFloat32 friction)
+{
+	m_coefficient = ndClamp(friction, ndFloat32(0.0f), ndFloat32(1.0f));
+}
+
+ndFloat32 ndJointDryRollingFriction::GetContactTrail() const
+{
+	return m_contactTrail;
+}
+
+ndFloat32 ndJointDryRollingFriction::GetFrictionCoefficient() const
+{
+	return m_coefficient;
+}
+
 
 // rolling friction works as follow: the idealization of the contact of a spherical object 
 // with a another surface is a point that pass by the center of the sphere.

@@ -71,8 +71,8 @@ ndQuaternion::ndQuaternion(const ndMatrix& matrix)
 
 #ifdef _DEBUG
 
-	ndMatrix tmp (*this, matrix.m_posit);
-	ndMatrix unitMatrix (tmp * matrix.Inverse());
+	ndMatrix tmp (ndCalculateMatrix(*this, matrix.m_posit));
+	ndMatrix unitMatrix (tmp * matrix.OrthoInverse());
 	for (ndInt32 i = 0; i < 4; ++i) 
 	{
 		ndFloat32 err = ndAbs (unitMatrix[i][i] - ndFloat32(1.0f));
@@ -194,4 +194,20 @@ ndQuaternion ndQuaternion::Slerp (const ndQuaternion &q1, ndFloat32 t) const
 	return q0;
 }
 
+void ndQuaternion::GetEulerAngles(ndVector& euler1, ndVector& euler2) const
+{
+	ndMatrix matrix (ndCalculateMatrix(*this, ndVector::m_wOne));
+	euler1 = matrix.CalcPitchYawRoll(euler2);
+}
 
+ndVector ndQuaternion::RotateVector(const ndVector& point) const
+{
+	ndMatrix matrix(ndCalculateMatrix(*this, ndVector::m_wOne));
+	return matrix.RotateVector(point);
+}
+
+ndVector ndQuaternion::UnrotateVector(const ndVector& point) const
+{
+	ndMatrix matrix(ndCalculateMatrix(*this, ndVector::m_wOne));
+	return matrix.UnrotateVector(point);
+}

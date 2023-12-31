@@ -15,9 +15,8 @@
 #pragma once
 #ifndef ND_VHACD_SARRAY_H
 #define ND_VHACD_SARRAY_H
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+
+#include "vhacdDefines.h"
 
 namespace nd_
 {
@@ -43,11 +42,11 @@ namespace nd_
 			{
 				return m_size;
 			}
-			T* const Data()
+			T* Data()
 			{
 				return (m_maxSize == N) ? m_data0 : m_data;
 			}
-			const T* const Data() const
+			const T* Data() const
 			{
 				return (m_maxSize == N) ? m_data0 : m_data;
 			}

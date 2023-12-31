@@ -36,8 +36,6 @@
 #define D_SLOP_JUMP_ANGLE			ndFloat32(0.8f)
 #define D_MAX_COLLISION_PENETRATION	ndFloat32 (5.0e-3f)
 
-D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndBodyPlayerCapsule)
-
 D_MSV_NEWTON_ALIGN_32
 class ndBodyPlayerCapsuleContactSolver
 {
@@ -78,8 +76,23 @@ class ndBodyPlayerCapsuleImpulseSolver
 	ndInt32 m_rowCount;
 } D_GCC_NEWTON_ALIGN_32;
 
+
+ndBodyPlayerCapsule::ndBodyPlayerCapsule()
+	:ndBodyKinematicBase()
+{
+}
+
 ndBodyPlayerCapsule::ndBodyPlayerCapsule(const ndMatrix& localAxis, ndFloat32 mass, ndFloat32 radius, ndFloat32 height, ndFloat32 stepHeight)
 	:ndBodyKinematicBase()
+{
+	Init(localAxis, mass, radius, height, stepHeight);
+}
+
+ndBodyPlayerCapsule::~ndBodyPlayerCapsule()
+{
+}
+
+void ndBodyPlayerCapsule::Init(const ndMatrix& localAxis, ndFloat32 mass, ndFloat32 radius, ndFloat32 height, ndFloat32 stepHeight)
 {
 	//m_contactTestOnly = 1;
 	m_impulse = ndVector::m_zero;
@@ -99,71 +112,21 @@ ndBodyPlayerCapsule::ndBodyPlayerCapsule(const ndMatrix& localAxis, ndFloat32 ma
 	ndMatrix shapeMatrix(localAxis);
 	shapeMatrix.m_posit = shapeMatrix.m_front.Scale(height * 0.5f);
 	shapeMatrix.m_posit.m_w = 1.0f;
-	
+
 	height = ndMax(height - 2.0f * radius / m_weistScale, ndFloat32(0.1f));
 	ndShapeInstance instance(new ndShapeCapsule(radius / m_weistScale, radius / m_weistScale, height));
 	instance.SetLocalMatrix(shapeMatrix);
-	instance.SetScale(ndVector (ndFloat32 (1.0f), m_weistScale, m_weistScale, ndFloat32 (0.0f)));
+	instance.SetScale(ndVector(ndFloat32(1.0f), m_weistScale, m_weistScale, ndFloat32(0.0f)));
 	ndBodyKinematic::SetCollisionShape(instance);
-	
+
 	SetMassMatrix(mass, instance);
 	m_invMass = GetInvMass();
 	m_mass = ndBodyKinematic::m_mass.m_w;
-		
+
 	m_localFrame = shapeMatrix;
 	m_localFrame.m_posit = ndVector::m_wOne;
 	m_contactPatch = radius / m_weistScale;
 	m_stepHeight = ndMax(stepHeight, m_contactPatch * ndFloat32(2.0f));
-}
-
-ndBodyPlayerCapsule::ndBodyPlayerCapsule(const ndLoadSaveBase::ndLoadDescriptor& desc)
-	:ndBodyKinematicBase(ndLoadSaveBase::ndLoadDescriptor(desc))
-{
-	const nd::TiXmlNode* const xmlNode = desc.m_rootNode;
-	//m_contactTestOnly = 1;
-	m_impulse = ndVector::m_zero;
-	m_headingAngle = ndFloat32(0.0f);
-	m_forwardSpeed = ndFloat32(0.0f);
-	m_lateralSpeed = ndFloat32(0.0f);
-	m_stepHeight = ndFloat32(0.0f);
-	m_contactPatch = ndFloat32(0.0f);
-	m_weistScale = ndFloat32(3.0f);
-	m_crouchScale = ndFloat32(0.5f);
-	m_isAirbone = false;
-	m_isOnFloor = false;
-	m_isCrouched = false;
-
-	m_localFrame = xmlGetMatrix(xmlNode, "localFrame");
-	m_mass = xmlGetFloat(xmlNode, "mass");
-	m_height = xmlGetFloat(xmlNode, "height");
-	m_radius = xmlGetFloat(xmlNode, "radius");
-	m_stepHeight = xmlGetFloat(xmlNode, "stepHeight");
-	m_weistScale = xmlGetFloat(xmlNode, "weistScale");
-	m_crouchScale = xmlGetFloat(xmlNode, "crouchScale");
-	
-	SetMassMatrix(m_mass, GetCollisionShape());
-	m_invMass = GetInvMass();
-	m_contactPatch = m_radius / m_weistScale;
-}
-
-ndBodyPlayerCapsule::~ndBodyPlayerCapsule()
-{
-}
-
-void ndBodyPlayerCapsule::Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
-{
-	nd::TiXmlElement* const childNode = new nd::TiXmlElement(ClassName());
-	desc.m_rootNode->LinkEndChild(childNode);
-	childNode->SetAttribute("hashId", desc.m_nodeNodeHash);
-	ndBodyKinematicBase::Save(ndLoadSaveBase::ndSaveDescriptor(desc, childNode));
-
-	xmlSaveParam(childNode, "localFrame", m_localFrame);
-	xmlSaveParam(childNode, "mass", m_mass);
-	xmlSaveParam(childNode, "height", m_height);
-	xmlSaveParam(childNode, "radius", m_radius);
-	xmlSaveParam(childNode, "stepHeight", m_stepHeight);
-	xmlSaveParam(childNode, "weistScale", m_weistScale);
-	xmlSaveParam(childNode, "crouchScale", m_crouchScale);
 }
 
 void ndBodyPlayerCapsule::ResolveStep(ndBodyPlayerCapsuleContactSolver& contactSolver, ndFloat32 timestep)
@@ -419,7 +382,6 @@ ndFloat32 ndBodyPlayerCapsule::PredictTimestep(ndBodyPlayerCapsuleContactSolver&
 			}
 			timestep += dt;
 		}
-		ndAssert(0);
 	}
 
 	return timestep;

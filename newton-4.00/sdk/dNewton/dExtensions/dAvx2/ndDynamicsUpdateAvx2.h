@@ -19,8 +19,8 @@
 * 3. This notice may not be removed or altered from any source distribution.
 */
 
-#ifndef __D_WORLD_DYNAMICS_UPDATE_AVX2_H__
-#define __D_WORLD_DYNAMICS_UPDATE_AVX2_H__
+#ifndef __ND_DYNAMICS_UPDATE_AVX2_H__
+#define __ND_DYNAMICS_UPDATE_AVX2_H__
 
 #include <ndNewton.h>
 
@@ -39,13 +39,6 @@ class ndDynamicsUpdateAvx2: public ndDynamicsUpdate
 	virtual void Update();
 
 	private:
-	class ndGroupType
-	{
-		public:
-		ndInt8 m_rows____;
-		ndInt8 m_isUniformGroup;
-	};
-
 	void SortJoints();
 	void SortIslands();
 	void BuildIsland();

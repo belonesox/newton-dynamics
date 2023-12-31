@@ -46,26 +46,29 @@ class ndShapeCompound: public ndShape
 		D_COLLISION_API void AddNode(ndNodeBase* const node, ndInt32 index, const ndShapeInstance* const parent);
 	};
 
-	D_CLASS_REFLECTION(ndShapeCompound);
+	D_CLASS_REFLECTION(ndShapeCompound,ndShape)
+
 	D_COLLISION_API ndShapeCompound();
-	D_COLLISION_API ndShapeCompound(const ndLoadSaveBase::ndLoadDescriptor& desc);
 	D_COLLISION_API virtual ~ndShapeCompound();
 
 	void SetOwner(const ndShapeInstance* const myInstance);
 
 	D_COLLISION_API const ndTreeArray& GetTree() const;
+	D_COLLISION_API virtual ndUnsigned64 GetHash(ndUnsigned64 hash) const;
 
 	D_COLLISION_API virtual void BeginAddRemove();
+	D_COLLISION_API virtual void RemoveNode(ndTreeArray::ndNode* const node);
 	D_COLLISION_API virtual ndTreeArray::ndNode* AddCollision(ndShapeInstance* const part);
+	D_COLLISION_API virtual ndShapeInstance* GetShapeInstance(ndTreeArray::ndNode* const node);
 	D_COLLISION_API virtual void EndAddRemove();
 
 	protected:
 	class ndSpliteInfo;
-	ndShapeCompound(const ndShapeCompound& source, const ndShapeInstance* const myInstance);
+	D_COLLISION_API ndShapeCompound(const ndShapeCompound& source, const ndShapeInstance* const myInstance);
+
 	virtual ndShapeInfo GetShapeInfo() const;
 	virtual void DebugShape(const ndMatrix& matrix, ndShapeDebugNotify& debugCallback) const;
 	virtual ndFloat32 RayCast(ndRayCastNotify& callback, const ndVector& localP0, const ndVector& localP1, ndFloat32 maxT, const ndBody* const body, ndContactPoint& contactOut) const;
-	virtual void Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const;
 
 	virtual ndFloat32 GetVolume() const;
 	virtual ndFloat32 GetBoxMinRadius() const;
@@ -103,6 +106,7 @@ class ndShapeCompound: public ndShape
 	friend class ndBodyKinematic;
 	friend class ndShapeInstance;
 	friend class ndContactSolver;
+	friend class ndFileFormatShapeCompound;
 };
 
 inline ndShapeCompound* ndShapeCompound::GetAsShapeCompound()

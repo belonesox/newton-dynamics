@@ -23,20 +23,20 @@
 #define __ND_CUDA_UTILS_H__
 
 #include "ndCudaStdafx.h"
+
 #ifdef D_DISABLE_ASSERT
 	#define ndAssert(x)
 #else 
-	#if (defined (WIN32) || defined(_WIN32) || defined (_M_ARM) || defined (_M_ARM64))
-		#define ndAssert(x) _ASSERTE(x)
-	#else
-		#ifdef _DEBUG
+	#ifdef _DEBUG
+		#if (defined (WIN32) || defined(_WIN32) || defined (_M_ARM) || defined (_M_ARM64))
+			#define ndAssert(x) _ASSERTE(x)
+		#else
 			#define ndAssert(x) assert(x)
-		#else 
-			#define ndAssert(x)
-		#endif
+	#endif
+	#else 
+		#define ndAssert(x)
 	#endif
 #endif
-
 
 #ifdef _MSC_VER 
 	#ifdef _DEBUG 
@@ -44,8 +44,9 @@
 	#endif
 #endif
 
+void cudaExpandTraceMessage(const char* const fmt, ...);
+
 #ifdef CUDA_TRACE
-	void cudaExpandTraceMessage(const char* const fmt, ...);
 	#define cuTrace(x) cudaExpandTraceMessage x;
 #else
 	#define cuTrace(x);
@@ -54,8 +55,30 @@
 typedef void* (*ndMemAllocCallback) (size_t size);
 typedef void (*ndMemFreeCallback) (void* const ptr);
 
-long long CudaGetTimeInMicroseconds();
-D_CUDA_API void CudaSetMemoryAllocators(ndMemAllocCallback alloc, ndMemFreeCallback free);
+D_CUDA_API void* ndCudaMalloc(size_t size);
+D_CUDA_API void ndCudaFree(void* const ptr);
 
+#define ndAlloca(type, count) (type*) alloca (sizeof (type) * (count))
+
+#define D_CUDA_OPERATOR_NEW_AND_DELETE		\
+inline void *operator new (size_t size)		\
+{											\
+	return ndCudaMalloc(size);				\
+}											\
+											\
+inline void *operator new[](size_t size) 	\
+{											\
+	return ndCudaMalloc(size);				\
+}											\
+											\
+inline void operator delete (void* ptr)		\
+{											\
+	ndCudaFree(ptr);						\
+}											\
+											\
+inline void operator delete[](void* ptr)	\
+{											\
+	ndCudaFree(ptr);						\
+}
 
 #endif

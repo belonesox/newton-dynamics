@@ -27,8 +27,6 @@
 #define D_CONVEX_VERTEX_SPLIT_BOX			8
 #define D_CONVEX_VERTEX_BRUTE_FORCE_SPLIT	(3 * D_CONVEX_VERTEX_SPLIT_BOX)
 
-D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndShapeConvexHull)
-
 D_MSV_NEWTON_ALIGN_32
 class ndShapeConvexHull::ndConvexBox
 {
@@ -69,30 +67,6 @@ ndShapeConvexHull::ndShapeConvexHull (ndInt32 count, ndInt32 strideInBytes, ndFl
 	//}
 }
 
-ndShapeConvexHull::ndShapeConvexHull(const ndLoadSaveBase::ndLoadDescriptor& desc)
-	:ndShapeConvex(m_convexHull)
-	,m_supportTree(nullptr)
-	,m_faceArray(nullptr)
-	,m_soa_x(nullptr)
-	,m_soa_y(nullptr)
-	,m_soa_z(nullptr)
-	,m_soa_index(nullptr)
-	,m_vertexToEdgeMapping(nullptr)
-	,m_faceCount(0)
-	,m_soaVertexCount(0)
-	,m_supportTreeCount(0)
-{
-	m_edgeCount = 0;
-	m_vertexCount = 0;
-	m_vertex = nullptr;
-	m_simplex = nullptr;
-
-	const nd::TiXmlNode* const xmlNode = desc.m_rootNode;
-	ndArray<ndVector> array;
-	xmlGetFloatArray3(xmlNode, "vextexArray3", array);
-	Create(array.GetCount(), sizeof (ndVector), &array[0].m_x, ndFloat32 (0.0f), 0x7fffffff);
-}
-
 ndShapeConvexHull::~ndShapeConvexHull()
 {
 	if (m_vertexToEdgeMapping) 
@@ -117,22 +91,6 @@ ndShapeConvexHull::~ndShapeConvexHull()
 		ndMemory::Free(m_soa_z);
 		ndMemory::Free(m_soa_index);
 	}
-}
-
-void ndShapeConvexHull::Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
-{
-	nd::TiXmlElement* const childNode = new nd::TiXmlElement(ClassName());
-	desc.m_rootNode->LinkEndChild(childNode);
-	childNode->SetAttribute("hashId", desc.m_nodeNodeHash);
-	ndShapeConvex::Save(ndLoadSaveBase::ndSaveDescriptor(desc, childNode));
-
-	ndArray<ndVector> array;
-	array.SetCount(m_vertexCount);
-	for (ndInt32 i = 0; i < m_vertexCount; ++i)
-	{
-		array[i] = m_vertex[i];
-	}
-	xmlSaveParam(childNode, "vextexArray3", array);
 }
 
 bool ndShapeConvexHull::Create(ndInt32 count, ndInt32 strideInBytes, const ndFloat32* const vertexArray, ndFloat32 tolerance, ndInt32 maxPointsOut)
@@ -371,7 +329,7 @@ bool ndShapeConvexHull::Create(ndInt32 count, ndInt32 strideInBytes, const ndFlo
 		}
 	}
 	m_faceArray = (ndConvexSimplexEdge **)ndMemory::Malloc(size_t(m_faceCount * sizeof(ndConvexSimplexEdge *)));
-	memcpy(m_faceArray, &faceArray[0], m_faceCount * sizeof(ndConvexSimplexEdge *));
+	ndMemCpy(m_faceArray, &faceArray[0], m_faceCount);
 	
 	ndFixSizeArray<ndVector, D_CONVEX_VERTEX_BRUTE_FORCE_SPLIT> array;
 	array.SetCount(D_CONVEX_VERTEX_BRUTE_FORCE_SPLIT);
@@ -580,7 +538,7 @@ bool ndShapeConvexHull::Create(ndInt32 count, ndInt32 strideInBytes, const ndFlo
 		
 		m_supportTreeCount = boxCount;
 		m_supportTree = (ndConvexBox*)ndMemory::Malloc(size_t(boxCount * sizeof(ndConvexBox)));
-		memcpy(m_supportTree, &boxTree[0], boxCount * sizeof(ndConvexBox));
+		ndMemCpy(m_supportTree, &boxTree[0], boxCount);
 		
 		for (ndInt32 i = 0; i < m_edgeCount; ++i) 
 		{
@@ -1023,3 +981,7 @@ void ndShapeConvexHull::DebugShape(const ndMatrix& matrix, ndShapeDebugNotify& d
 	}
 }
 
+ndUnsigned64 ndShapeConvexHull::GetHash(ndUnsigned64 hash) const
+{
+	return ndCRC64(&m_vertex[0].m_x, m_vertexCount * ndInt32 (sizeof(ndVector)), hash);
+}

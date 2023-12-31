@@ -13,7 +13,11 @@
 #include "ndNewtonStdafx.h"
 #include "ndIkJointDoubleHinge.h"
 
-D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndIkJointDoubleHinge)
+ndIkJointDoubleHinge::ndIkJointDoubleHinge()
+	:ndJointDoubleHinge()
+	,ndJointBilateralConstraint::ndIkInterface()
+{
+}
 
 ndIkJointDoubleHinge::ndIkJointDoubleHinge(const ndMatrix& pinAndPivotFrame, ndBodyKinematic* const child, ndBodyKinematic* const parent)
 	:ndJointDoubleHinge(pinAndPivotFrame, child, parent)
@@ -21,28 +25,8 @@ ndIkJointDoubleHinge::ndIkJointDoubleHinge(const ndMatrix& pinAndPivotFrame, ndB
 {
 }
 
-//ndIkJointDoubleHinge::ndIkJointDoubleHinge(const ndMatrix& pinAndPivotInChild, const ndMatrix& pinAndPivotInParent, ndBodyKinematic* const child, ndBodyKinematic* const parent)
-//	:ndJointDoubleHinge(pinAndPivotInChild, pinAndPivotInParent, child, parent)
-//	,ndIkInterface()
-//{
-//}
-
-ndIkJointDoubleHinge::ndIkJointDoubleHinge(const ndLoadSaveBase::ndLoadDescriptor& desc)
-	:ndJointDoubleHinge(ndLoadSaveBase::ndLoadDescriptor(desc))
-	,ndJointBilateralConstraint::ndIkInterface()
-{
-}
-
 ndIkJointDoubleHinge::~ndIkJointDoubleHinge()
 {
-}
-
-void ndIkJointDoubleHinge::Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
-{
-	nd::TiXmlElement* const childNode = new nd::TiXmlElement(ClassName());
-	desc.m_rootNode->LinkEndChild(childNode);
-	childNode->SetAttribute("hashId", desc.m_nodeNodeHash);
-	ndJointDoubleHinge::Save(ndLoadSaveBase::ndSaveDescriptor(desc, childNode));
 }
 
 void ndIkJointDoubleHinge::JacobianDerivative(ndConstraintDescritor& desc)

@@ -13,18 +13,15 @@
 #include "ndSkyBox.h"
 #include "ndDemoMesh.h"
 #include "ndUIEntity.h"
+#include "ndMeshLoader.h"
 #include "ndDemoCamera.h"
-#include "ndLoadFbxMesh.h"
 #include "ndPhysicsUtils.h"
 #include "ndPhysicsWorld.h"
 #include "ndMakeStaticMap.h"
-#include "ndAnimationPose.h"
 #include "ndContactCallback.h"
 #include "ndDemoEntityNotify.h"
 #include "ndDemoEntityManager.h"
 #include "ndDemoInstanceEntity.h"
-#include "ndAnimationSequenceBase.h"
-#include "ndAnimationSequencePlayer.h"
 
 namespace ndQuadruped_3
 {
@@ -94,8 +91,8 @@ namespace ndQuadruped_3
 			const ndShapeMaterial& material0 = instanceShape0.GetMaterial();
 			const ndShapeMaterial& material1 = instanceShape1.GetMaterial();
 
-			ndUnsigned64 pointer0 = material0.m_userParam[ndContactCallback::m_modelPointer].m_intData;
-			ndUnsigned64 pointer1 = material1.m_userParam[ndContactCallback::m_modelPointer].m_intData;
+			ndUnsigned64 pointer0 = material0.m_userParam[ndDemoContactCallback::m_modelPointer].m_intData;
+			ndUnsigned64 pointer1 = material1.m_userParam[ndDemoContactCallback::m_modelPointer].m_intData;
 			if (pointer0 == pointer1)
 			{
 				// here we know the part are from the same model.
@@ -106,7 +103,8 @@ namespace ndQuadruped_3
 		}
 	};
 
-	class ndWalkSequence : public ndAnimationSequenceBase
+	//class ndWalkSequence : public ndAnimationSequenceBase
+	class ndWalkSequence : public ndAnimationSequence
 	{
 		public:
 		class ndSegment
@@ -148,7 +146,7 @@ namespace ndQuadruped_3
 		};
 
 		ndWalkSequence(ndFloat32 midParam)
-			:ndAnimationSequenceBase()
+			:ndAnimationSequence()
 			,m_segment0()
 			,m_segment1()
 			,m_xBias(0.11f)
@@ -237,7 +235,7 @@ namespace ndQuadruped_3
 		public:
 		#define D_SAMPLES_COUNT 128
 
-		D_CLASS_REFLECTION(ndQuadruped_3::ndQuadrupedModel);
+		D_CLASS_REFLECTION(ndQuadruped_3::ndQuadrupedModel, ndModel)
 
 		class ndEffectorInfo
 		{
@@ -375,55 +373,9 @@ namespace ndQuadruped_3
 			m_param_xxxx = ndParamMapper(0.0, 0.75f);
 			
 			m_output.SetCount(4);
-			m_walk = new ndAnimationSequencePlayer(&m_walkCycle);
-			m_animBlendTree = m_walk;
-		}
-
-		ndQuadrupedModel(const ndLoadSaveBase::ndLoadDescriptor& desc)
-			:ndModel(ndLoadSaveBase::ndLoadDescriptor(desc))
-			,m_invDynamicsSolver()
-			,m_walk(nullptr)
-			,m_animBlendTree(nullptr)
-			,m_output()
-			,m_walkCycle(0.75f)
-			,m_trotCycle(0.4f)
-			,m_effectorsInfo()
-			,m_bodyArray()
-			,m_effectorsJoints()
-		{
-			const nd::TiXmlNode* const modelRootNode = desc.m_rootNode;
-
 			ndAssert(0);
-			const nd::TiXmlNode* const bodies = modelRootNode->FirstChild("bodies");
-			for (const nd::TiXmlNode* node = bodies->FirstChild(); node; node = node->NextSibling())
-			{
-				ndInt32 hashId;
-				const nd::TiXmlElement* const element = (nd::TiXmlElement*) node;
-				element->Attribute("int32", &hashId);
-				//ndBodyLoaderCache::ndNode* const bodyNode = desc.m_bodyMap->Find(hashId);
-				//ndBody* const body = (ndBody*)bodyNode->GetInfo();
-			}
-
-			const nd::TiXmlNode* const joints = modelRootNode->FirstChild("joints");
-			for (const nd::TiXmlNode* node = joints->FirstChild(); node; node = node->NextSibling())
-			{
-				ndInt32 hashId;
-				const nd::TiXmlElement* const element = (nd::TiXmlElement*) node;
-				element->Attribute("int32", &hashId);
-				//ndJointLoaderCache::ndNode* const jointNode = desc.m_jointMap->Find(hashId);
-				//ndJointBilateralConstraint* const joint = (ndJointBilateralConstraint*)jointNode->GetInfo();
-			}
-
-			// load root body
-			//ndBodyLoaderCache::ndNode* const rootBodyNode = desc.m_bodyMap->Find(xmlGetInt(modelRootNode, "rootBodyHash"));
-			//ndBodyDynamic* const rootBody = ((ndBody*)rootBodyNode->GetInfo())->GetAsBodyDynamic();
-
-			// load effector joint
-			const nd::TiXmlNode* const endEffectorNode = modelRootNode->FirstChild("endEffector");
-			if (xmlGetInt(endEffectorNode, "hasEffector"))
-			{
-				ndAssert(0);
-			}
+			//m_walk = new ndAnimationSequencePlayer(&m_walkCycle);
+			m_animBlendTree = m_walk;
 		}
 
 		~ndQuadrupedModel()
@@ -433,6 +385,9 @@ namespace ndQuadruped_3
 				delete m_animBlendTree;
 			}
 		}
+
+		virtual void OnAddToWorld() { ndAssert(0); }
+		virtual void OnRemoveFromToWorld() { ndAssert(0); }
 
 		void NormalizeMassDistribution(ndFloat32 mass) const
 		{
@@ -485,56 +440,6 @@ namespace ndQuadruped_3
 			}
 		}
 
-		void Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
-		{
-			nd::TiXmlElement* const modelRootNode = new nd::TiXmlElement(ClassName());
-			desc.m_rootNode->LinkEndChild(modelRootNode);
-			modelRootNode->SetAttribute("hashId", desc.m_nodeNodeHash);
-			ndModel::Save(ndLoadSaveBase::ndSaveDescriptor(desc, modelRootNode));
-
-			ndAssert(0);
-			// save all bodies.
-			//nd::TiXmlElement* const bodiesNode = new nd::TiXmlElement("bodies");
-			//modelRootNode->LinkEndChild(bodiesNode);
-			//for (ndInt32 i = 0; i < m_bodyArray.GetCount(); ++i)
-			//{
-			//	nd::TiXmlElement* const paramNode = new nd::TiXmlElement("body");
-			//	bodiesNode->LinkEndChild(paramNode);
-			//
-			//	ndTree<ndInt32, const ndBodyKinematic*>::ndNode* const bodyPartNode = desc.m_bodyMap->Insert(desc.m_bodyMap->GetCount(), m_bodyArray[i]);
-			//	paramNode->SetAttribute("int32", bodyPartNode->GetInfo());
-			//}
-			//
-			//// save all joints
-			//nd::TiXmlElement* const jointsNode = new nd::TiXmlElement("joints");
-			//modelRootNode->LinkEndChild(jointsNode);
-			//for (ndInt32 i = 0; i < m_jointArray.GetCount(); ++i)
-			//{
-			//	nd::TiXmlElement* const paramNode = new nd::TiXmlElement("joint");
-			//	jointsNode->LinkEndChild(paramNode);
-			//
-			//	ndTree<ndInt32, const ndJointBilateralConstraint*>::ndNode* const jointPartNode = desc.m_jointMap->Insert(desc.m_jointMap->GetCount(), m_jointArray[i]);
-			//	paramNode->SetAttribute("int32", jointPartNode->GetInfo());
-			//}
-			//
-			//// indicate which body is the root
-			//xmlSaveParam(modelRootNode, "rootBodyHash", desc.m_bodyMap->Find(m_rootBody)->GetInfo());
-			//
-			//// save end effector info
-			//nd::TiXmlElement* const endEffectorNode = new nd::TiXmlElement("endEffector");
-			//modelRootNode->LinkEndChild(endEffectorNode);
-			//
-			//ndAssert(0);
-			////xmlSaveParam(endEffectorNode, "hasEffector", m_effector ? 1 : 0);
-			////if (m_effector)
-			////{
-			////	ndTree<ndInt32, const ndBodyKinematic*>::ndNode* const effectBody0 = desc.m_bodyMap->Find(m_effector->GetBody0());
-			////	ndTree<ndInt32, const ndBodyKinematic*>::ndNode* const effectBody1 = desc.m_bodyMap->Find(m_effector->GetBody1());
-			////	xmlSaveParam(endEffectorNode, "body0Hash", effectBody0->GetInfo());
-			////	xmlSaveParam(endEffectorNode, "body1Hash", effectBody1->GetInfo());
-			////}
-		}
-
 		ndBodyDynamic* CreateBodyPart(ndDemoEntityManager* const scene, ndDemoEntity* const entityPart, ndFloat32 mass, ndBodyDynamic* const parentBone)
 		{
 			ndSharedPtr<ndShapeInstance> shapePtr(entityPart->CreateCollisionFromChildren());
@@ -551,8 +456,8 @@ namespace ndQuadruped_3
 			body->SetNotifyCallback(new ndDemoEntityNotify(scene, entityPart, parentBone));
 
 			ndShapeInstance& instanceShape = body->GetCollisionShape();
-			instanceShape.m_shapeMaterial.m_userId = ndApplicationMaterial::m_modelPart;
-			instanceShape.m_shapeMaterial.m_userParam[ndContactCallback::m_modelPointer].m_intData = ndUnsigned64(this);
+			instanceShape.m_shapeMaterial.m_userId = ndDemoContactCallback::m_modelPart;
+			instanceShape.m_shapeMaterial.m_userParam[ndDemoContactCallback::m_modelPointer].m_ptrData = this;
 
 			// add body to the world
 			ndSharedPtr<ndBody> bodyPtr(body);
@@ -622,7 +527,7 @@ namespace ndQuadruped_3
 			//{
 			//	ndMatrix rotation(ndPitchMatrix(90.0f * ndDegreeToRad));
 			//	rotation.TransformTriplex(&contactPoints[0].m_x, sizeof(ndVector), &contactPoints[0].m_x, sizeof(ndVector), contactPoints.GetCount());
-			//	ndInt32 supportCount = dConvexHull2d(&contactPoints[0], contactPoints.GetCount());
+			//	ndInt32 supportCount = ndConvexHull2d(&contactPoints[0], contactPoints.GetCount());
 			//	rotation.Inverse().TransformTriplex(&contactPoints[0].m_x, sizeof(ndVector), &contactPoints[0].m_x, sizeof(ndVector), contactPoints.GetCount());
 			//	ndVector p0(contactPoints[supportCount - 1]);
 			//	ndBigVector bigPolygon[16];
@@ -672,18 +577,19 @@ namespace ndQuadruped_3
 			ndFloat32 animSpeed = m_param_xxxx.Interpolate(m_param_x0);
 			m_timer = ndMod(m_timer + timestep * animSpeed, ndFloat32(1.0f));
 
-			m_walk->SetParam(1.0f - m_timer);
-			m_animBlendTree->Evaluate(m_output);
-			for (ndInt32 i = 0; i < m_effectorsInfo.GetCount(); i++)
-			{
-				ndEffectorInfo& info = m_effectorsInfo[i];
-				const ndAnimKeyframe& keyFrame = m_output[i];
-				ndVector posit(info.m_basePosition);
-				posit.m_x += keyFrame.m_posit.m_x;
-				posit.m_y += keyFrame.m_posit.m_y;
-				posit.m_z += keyFrame.m_posit.m_z;
-				info.m_effector->SetLocalTargetPosition(posit);
-			}
+			ndAssert(0);
+			//m_walk->SetParam(1.0f - m_timer);
+			//m_animBlendTree->Evaluate(m_output);
+			//for (ndInt32 i = 0; i < m_effectorsInfo.GetCount(); i++)
+			//{
+			//	ndEffectorInfo& info = m_effectorsInfo[i];
+			//	const ndAnimKeyframe& keyFrame = m_output[i];
+			//	ndVector posit(info.m_basePosition);
+			//	posit.m_x += keyFrame.m_posit.m_x;
+			//	posit.m_y += keyFrame.m_posit.m_y;
+			//	posit.m_z += keyFrame.m_posit.m_z;
+			//	info.m_effector->SetLocalTargetPosition(posit);
+			//}
 
 			ndSkeletonContainer* const skeleton = m_bodyArray[0]->GetSkeleton();
 			ndAssert(skeleton);
@@ -717,18 +623,17 @@ namespace ndQuadruped_3
 		ndReal m_param_x0;
 		ndParamMapper m_param_xxxx;
 	};
-	D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndQuadruped_3::ndQuadrupedModel);
 
-	class ndQuadrupedUI : public ndUIEntity
+	class ndModelUI : public ndUIEntity
 	{
 		public:
-		ndQuadrupedUI(ndDemoEntityManager* const scene, ndQuadrupedModel* const quadruped)
+		ndModelUI(ndDemoEntityManager* const scene, ndQuadrupedModel* const quadruped)
 			:ndUIEntity(scene)
-			,m_quadruped(quadruped)
+			,m_model(quadruped)
 		{
 		}
 
-		~ndQuadrupedUI()
+		~ndModelUI()
 		{
 		}
 
@@ -743,7 +648,7 @@ namespace ndQuadruped_3
 
 			bool change = false;
 			ImGui::Text("position x");
-			change = change | ImGui::SliderFloat("##x", &m_quadruped->m_param_x0, -1.0f, 1.0f);
+			change = change | ImGui::SliderFloat("##x", &m_model->m_param_x0, -1.0f, 1.0f);
 			//ImGui::Text("position y");
 			//change = change | ImGui::SliderFloat("##y", &info.m_y, -1.0f, 1.0f);
 			//ImGui::Text("position z");
@@ -751,13 +656,13 @@ namespace ndQuadruped_3
 
 			if (change)
 			{
-				m_quadruped->m_bodyArray[0]->SetSleepState(false);
+				m_model->m_bodyArray[0]->SetSleepState(false);
 			}
 		}
 
-		ndQuadrupedModel* m_quadruped;
+		ndQuadrupedModel* m_model;
 	};
-};
+}
 
 using namespace ndQuadruped_3;
 void ndQuadrupedTest_3(ndDemoEntityManager* const scene)
@@ -767,7 +672,8 @@ void ndQuadrupedTest_3(ndDemoEntityManager* const scene)
 	//BuildFloorBox(scene, ndGetIdentityMatrix());
 	
 	ndVector origin1(0.0f, 0.0f, 0.0f, 1.0f);
-	ndSharedPtr<ndDemoEntity> modelMesh (ndDemoEntity::LoadFbx("spotBoston.fbx", scene));
+	ndMeshLoader loader;
+	ndSharedPtr<ndDemoEntity> modelMesh (loader.LoadEntity("spotBoston.fbx", scene));
 	
 	ndWorld* const world = scene->GetWorld();
 	ndMatrix matrix(ndYawMatrix(-0.0f * ndDegreeToRad));
@@ -781,8 +687,8 @@ void ndQuadrupedTest_3(ndDemoEntityManager* const scene)
 	material.m_dynamicFriction1 = 0.9f;
 	
 	ndContactCallback* const callback = (ndContactCallback*)scene->GetWorld()->GetContactNotify();
-	callback->RegisterMaterial(material, ndApplicationMaterial::m_modelPart, ndApplicationMaterial::m_default);
-	callback->RegisterMaterial(material, ndApplicationMaterial::m_modelPart, ndApplicationMaterial::m_modelPart);
+	callback->RegisterMaterial(material, ndDemoContactCallback::m_modelPart, ndDemoContactCallback::m_default);
+	callback->RegisterMaterial(material, ndDemoContactCallback::m_modelPart, ndDemoContactCallback::m_modelPart);
 	
 	ndQuadrupedModel* const robot0 = new ndQuadrupedModel(scene, *modelMesh, matrix);
 	scene->SetSelectedModel(robot0);
@@ -808,7 +714,7 @@ void ndQuadrupedTest_3(ndDemoEntityManager* const scene)
 	ndSharedPtr<ndJointBilateralConstraint> fixJoint(new ndJointFix6dof(robot0->GetRoot()->GetMatrix(), robot0->GetRoot(), world->GetSentinelBody()));
 	world->AddJoint(fixJoint);
 
-	ndQuadrupedUI* const quadrupedUI = new ndQuadrupedUI(scene, robot0);
+	ndModelUI* const quadrupedUI = new ndModelUI(scene, robot0);
 	ndSharedPtr<ndUIEntity> quadrupedUIPtr(quadrupedUI);
 	scene->Set2DDisplayRenderFunction(quadrupedUIPtr);
 

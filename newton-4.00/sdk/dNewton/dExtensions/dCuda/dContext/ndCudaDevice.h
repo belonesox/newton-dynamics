@@ -34,10 +34,75 @@ class ndCudaDevice
 	ndCudaDevice();
 	~ndCudaDevice();
 
-	struct cudaDeviceProp m_prop;
-	double m_frequency;
-	unsigned m_valid;
-	unsigned m_blocksPerKernelCall;
+	void* operator new (size_t size);
+	void operator delete (void* ptr);
+
+	void SyncDevice() const;
+	int GetComputeUnits() const;
+
+	cudaDeviceProp m_prop;
+	cudaEvent_t m_startTimer;
+	cudaEvent_t m_stopTimer;
+	cudaEvent_t m_syncEvent;
+	cudaStream_t m_childStream;
+
+	int* m_statusMemory;
+	int m_computeUnits;
+	int m_workGroupSize;
+	int m_timerFrames;
+	float m_timeAcc;
+	cudaError_t m_lastError;
 };
+
+class ndKernelParams
+{
+	public:
+	ndKernelParams() {}
+	ndKernelParams(const ndCudaDevice* const device, int workGroupSize, int itemCount);
+
+	__device__ __host__ ndKernelParams(const ndKernelParams& params, int workGroupSize, int itemCount)
+		:m_itemCount(itemCount)
+		,m_workGroupSize(workGroupSize)
+		,m_deviceComputeUnits(params.m_deviceComputeUnits)
+	{
+		int computeUnitsBashCount = (itemCount + m_workGroupSize - 1) / m_workGroupSize;
+		m_blocksPerKernel = (computeUnitsBashCount + m_deviceComputeUnits - 1) / m_deviceComputeUnits;
+		m_kernelCount = (itemCount + m_blocksPerKernel * m_workGroupSize - 1) / (m_blocksPerKernel * m_workGroupSize);
+	}
+
+	int m_itemCount;
+	int m_kernelCount;
+	int m_workGroupSize;
+	int m_blocksPerKernel;
+	int m_deviceComputeUnits;
+};
+
+class ndErrorCode
+{
+	public:
+	ndErrorCode();
+	ndErrorCode(ndCudaDevice* const context);
+	~ndErrorCode();
+
+	int __device__ __host__ Get() const
+	{
+		return m_baseAdress[m_offset];
+	}
+
+	void __device__ __host__ Set(int x)
+	{
+		m_baseAdress[m_offset] = x;
+	}
+
+	int* Pointer() const
+	{
+		return &m_baseAdress[m_offset];
+	}
+
+	private:
+	int* m_baseAdress;
+	int m_offset;
+};
+
 
 #endif

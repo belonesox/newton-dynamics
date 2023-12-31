@@ -28,7 +28,7 @@
 	#endif
 #endif
 
-#define ND_NEWTON_VERSION	402
+#define ND_NEWTON_VERSION	403
 
 #if (defined (WIN32) || defined(_WIN32) || defined (_M_ARM) || defined (_M_ARM64))
 	#define NOMINMAX
@@ -58,12 +58,10 @@
 #include <string.h>
 #include <stdarg.h>
 #include <locale.h>
-#include <tinyxml.h>
 #include <condition_variable>
 
-// we need _clearfp() and _controlfp() from float.h which are excluded if __STRICT_ANSI__ is defined
-// weird workaround but i'm not sure how a global compiler flag would affect the rest of the code
-// probably useless since this functionality will not be used/implemented but to avoid compiler errors
+// weird workaround but i am not sure how a global compiler flag would affect the rest of the code
+// probably useless since this functionality will not be used/implemented but avoid compiler errors
 #if defined(__STRICT_ANSI__) && (defined (__MINGW32__) || defined (__MINGW64__))
 	#pragma push_macro("__STRICT_ANSI__")
 	#undef __STRICT_ANSI__
@@ -92,6 +90,7 @@
 
 	#include <unistd.h>
 	#include <assert.h>
+	#include <cstdint>
 	// it was __ARMCC_VERSION before, it should be __ARM__ or aarch64, otherwise cross compiling in gcc fails.
 	#if (!defined(__arm__) && !defined(__aarch64__)) 
 		extern "C" 
@@ -107,6 +106,7 @@
 
 #if defined (__x86_64) || defined(__x86_64__) || defined(_M_IX86) || defined(_M_X64)
 	#include <immintrin.h>
+	#define D_USE_SSE3
 #endif
 
 #if defined(__arm__) && defined(__aarch64__) 
@@ -161,19 +161,15 @@
 #ifdef D_DISABLE_ASSERT
 	#define ndAssert(x)
 #else 
-	#if (defined (WIN32) || defined(_WIN32) || defined (_M_ARM) || defined (_M_ARM64))
-		#define ndAssert(x) _ASSERTE(x)
-	#else
-		#ifdef _DEBUG
+	#ifdef _DEBUG
+		#if (defined (WIN32) || defined(_WIN32) || defined (_M_ARM) || defined (_M_ARM64))
+			#define ndAssert(x) _ASSERTE(x)
+		#else
 			#define ndAssert(x) assert(x)
-		#else 
-			#define ndAssert(x)
 		#endif
+	#else 
+		#define ndAssert(x)
 	#endif
-#endif
-
-#ifdef _DEBUG
-//#define __ENABLE_D_CONTAINERS_SANITY_CHECK 
 #endif
 
 #if defined(_MSC_VER)
@@ -224,9 +220,9 @@ typedef double ndFloat64;
 #else
 	typedef float ndFloat32;
 #endif
-
+	
 #define ndPi	 		ndFloat32 (3.141592f)
-#define ndEXP		 	ndFloat32 (2.71828f)
+//#define ndEXP		 	ndFloat32 (2.7182818f)
 #define ndEpsilon	  	ndFloat32 (1.0e-5f)
 #define ndDegreeToRad	ndFloat32 (ndPi / 180.0f)
 #define ndRadToDegree  	ndFloat32 (180.0f / ndPi)
@@ -239,16 +235,18 @@ typedef double ndFloat64;
 #define ndLog(x)		ndFloat32 (log(x))
 #define ndCeil(x)		ndFloat32 (ceil(x))
 #define ndFloor(x)		ndFloat32 (floor(x))	
+#define ndExp(x)		ndFloat32 (exp(x))
 #define ndPow(x,y)		ndFloat32 (pow(x,y))
 #define ndFmod(x,y)		ndFloat32 (fmod(x,y))
 #define ndTan(x)		ndFloat32 (tan(x))
+#define ndTanh(x)		ndFloat32 (tanh(x))
 #define ndAtan(x)		ndFloat32 (atan(x))
 #define ndAtan2(x,y)	ndFloat32 (atan2(x,y))
 #define ndRsqrt(x)		(ndFloat32 (1.0f) / ndSqrt(x))
 
 #if (defined (WIN32) || defined(_WIN32) || defined (_M_ARM) || defined (_M_ARM64))
-	//#define ndCheckFloat(x) (_finite(x) && !_isnan(x))
-	#define ndCheckFloat(x) (1)
+	//#define ndCheckFloat(x) (1)
+	#define ndCheckFloat(x) (_finite(x) && !_isnan(x))
 #else
 	//#define ndCheckFloat(x) (isfinite(x) && !isnan(x))
 	#define ndCheckFloat(x) (1)
@@ -267,6 +265,16 @@ typedef double ndFloat64;
 		ndFloat32 m_fVal;
 	};
 #endif
+
+union ndIntPtr
+{
+	ndIntPtr()
+		:m_int(0)
+	{
+	}
+	void* m_ptr;
+	ndInt64 m_int;
+};
 
 union ndDoubleInt
 {
@@ -288,6 +296,34 @@ class ndTriplex
 	ndFloat32 m_z;
 };
 
+#define D_BASE_CLASS_REFLECTION(Class)			\
+	virtual const char* ClassName() const		\
+	{											\
+	return #Class;								\
+	}											\
+	static const char* StaticClassName()		\
+	{											\
+	return #Class;								\
+	}											\
+	virtual const char* SuperClassName() const	\
+	{											\
+		return #Class;							\
+	}
+
+#define D_CLASS_REFLECTION(Class,SuperClass)	\
+	virtual const char* ClassName() const		\
+	{											\
+		return #Class;							\
+	}											\
+	static const char* StaticClassName()		\
+	{											\
+		return #Class;							\
+	}											\
+	virtual const char* SuperClassName() const	\
+	{											\
+		return #SuperClass;						\
+	}
+
 #define D_OPERATOR_NEW_AND_DELETE			\
 inline void *operator new (size_t size)		\
 {											\
@@ -308,7 +344,6 @@ inline void operator delete[](void* ptr)	\
 {											\
 	ndMemory::Free(ptr);					\
 }
-
 
 #ifdef D_USE_THREAD_EMULATION
 	/// wrapper over standard atomic operations
@@ -380,25 +415,8 @@ inline void operator delete[](void* ptr)	\
 	class ndAtomic : public std::atomic<T>
 	{
 		public:
-		ndAtomic<T>()
-			: std::atomic<T>(T(0))
-		{
-		}
-
-		ndAtomic<T>(T val)
-			: std::atomic<T>(val)
-		{
-		}
-
-		ndAtomic<T>(const ndAtomic<T>& copy)
-			: std::atomic<T>(copy.load())
-		{
-		}
-
-		T operator=(T value)
-		{
-			return std::atomic<T>::operator=(value);
-		}
+		using std::atomic<T>::atomic;
+		using std::atomic<T>::operator=;
 	};
 #endif
 

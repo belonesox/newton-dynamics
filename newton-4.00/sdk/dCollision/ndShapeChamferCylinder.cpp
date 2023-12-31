@@ -25,8 +25,6 @@
 #include "ndContactSolver.h"
 #include "ndShapeChamferCylinder.h"
 
-D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndShapeChamferCylinder)
-
 ndInt32 ndShapeChamferCylinder::m_shapeRefCount = 0;
 ndVector ndShapeChamferCylinder::m_yzMask (0, 0xffffffff, 0xffffffff, 0);
 ndVector ndShapeChamferCylinder::m_shapesDirs[DG_MAX_CHAMFERCYLINDER_DIR_COUNT];
@@ -38,16 +36,6 @@ ndShapeChamferCylinder::ndShapeChamferCylinder(ndFloat32 radius, ndFloat32 heigh
 	Init (radius, height);
 }
 
-ndShapeChamferCylinder::ndShapeChamferCylinder(const ndLoadSaveBase::ndLoadDescriptor& desc)
-	:ndShapeConvex(m_chamferCylinder)
-{
-	//ndVector size;
-	const nd::TiXmlNode* const xmlNode = desc.m_rootNode;
-	ndFloat32 radius = xmlGetFloat(xmlNode, "radius");
-	ndFloat32 height = xmlGetFloat(xmlNode, "height");
-	Init(radius, height);
-}
-
 ndShapeChamferCylinder::~ndShapeChamferCylinder()
 {
 	m_shapeRefCount --;
@@ -55,17 +43,6 @@ ndShapeChamferCylinder::~ndShapeChamferCylinder()
 
 	ndShapeConvex::m_simplex = nullptr;
 	ndShapeConvex::m_vertex = nullptr;
-}
-
-void ndShapeChamferCylinder::Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
-{
-	nd::TiXmlElement* const childNode = new nd::TiXmlElement(ClassName());
-	desc.m_rootNode->LinkEndChild(childNode);
-	childNode->SetAttribute("hashId", desc.m_nodeNodeHash);
-	ndShapeConvex::Save(ndLoadSaveBase::ndSaveDescriptor(desc, childNode));
-
-	xmlSaveParam(childNode, "radius", m_radius);
-	xmlSaveParam(childNode, "height", m_height * ndFloat32(2.0f));
 }
 
 void ndShapeChamferCylinder::Init (ndFloat32 radius, ndFloat32 height)
@@ -396,21 +373,28 @@ ndInt32 ndShapeChamferCylinder::CalculatePlaneIntersection(const ndVector& norma
 {
 	ndInt32 count = 0;
 	const ndFloat32 inclination = ndFloat32(0.9999f);
-	if (normal.m_x < -inclination) 
+	//if (normal.m_x < -inclination) 
+	//{
+	//	ndMatrix matrix(ndGramSchmidtMatrix(normal));
+	//	ndFloat32 x = ndSqrt(ndMax(m_height * m_height - origin.m_x * origin.m_x, ndFloat32(0.0f)));
+	//	matrix.m_posit.m_x = origin.m_x;
+	//	count = BuildCylinderCapPoly(m_radius + x, matrix, contactsOut);
+	//	//count = RectifyConvexSlice(n, normal, contactsOut);
+	//}
+	//else if (normal.m_x > inclination) 
+	//{
+	//	ndMatrix matrix(ndGramSchmidtMatrix(normal));
+	//	ndFloat32 x = ndSqrt(ndMax(m_height * m_height - origin.m_x * origin.m_x, ndFloat32(0.0f)));
+	//	matrix.m_posit.m_x = origin.m_x;
+	//	count = BuildCylinderCapPoly(m_radius + x, matrix, contactsOut);
+	//	//count = RectifyConvexSlice(n, normal, contactsOut);
+	//}
+	if (ndAbs(normal.m_x) > inclination)
 	{
-		ndMatrix matrix(normal);
+		ndMatrix matrix(ndGramSchmidtMatrix(normal));
 		ndFloat32 x = ndSqrt(ndMax(m_height * m_height - origin.m_x * origin.m_x, ndFloat32(0.0f)));
 		matrix.m_posit.m_x = origin.m_x;
 		count = BuildCylinderCapPoly(m_radius + x, matrix, contactsOut);
-		//count = RectifyConvexSlice(n, normal, contactsOut);
-	}
-	else if (normal.m_x > inclination) 
-	{
-		ndMatrix matrix(normal);
-		ndFloat32 x = ndSqrt(ndMax(m_height * m_height - origin.m_x * origin.m_x, ndFloat32(0.0f)));
-		matrix.m_posit.m_x = origin.m_x;
-		count = BuildCylinderCapPoly(m_radius + x, matrix, contactsOut);
-		//count = RectifyConvexSlice(n, normal, contactsOut);
 	}
 	else 
 	{
@@ -420,3 +404,8 @@ ndInt32 ndShapeChamferCylinder::CalculatePlaneIntersection(const ndVector& norma
 	return count;
 }
 
+ndUnsigned64 ndShapeChamferCylinder::GetHash(ndUnsigned64 hash) const
+{
+	ndShapeInfo info(GetShapeInfo());
+	return info.GetHash(hash);
+}

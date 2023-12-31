@@ -52,10 +52,11 @@ class ndWorld: public ndClassAlloc
 		ndSimdSoaSolver,
 		ndSimdAvx2Solver,
 		ndCudaSolver,
-		ndOpenclSolver1,
-		ndOpenclSolver2,
+		ndSyclSolverCpu,
+		ndSyclSolverGpu,
 	};
 
+	D_BASE_CLASS_REFLECTION(ndWorld)
 	D_NEWTON_API ndWorld();
 	D_NEWTON_API virtual ~ndWorld();
 
@@ -67,8 +68,6 @@ class ndWorld: public ndClassAlloc
 	D_NEWTON_API void Update(ndFloat32 timestep);
 	D_NEWTON_API void CollisionUpdate(ndFloat32 timestep);
 
-	D_NEWTON_API virtual void OnPostUpdate(ndFloat32 timestep);
-
 	D_NEWTON_API ndInt32 GetThreadCount() const;
 	D_NEWTON_API void SetThreadCount(ndInt32 count);
 
@@ -78,14 +77,18 @@ class ndWorld: public ndClassAlloc
 	D_NEWTON_API ndSolverModes GetSelectedSolver() const;
 	D_NEWTON_API void SelectSolver(ndSolverModes solverMode);
 
-	D_NEWTON_API bool IsGPU() const;
 	D_NEWTON_API ndScene* GetScene() const;
+	D_NEWTON_API bool IsHighPerformanceCompute() const;
 	D_NEWTON_API const char* GetSolverString() const;
 	D_NEWTON_API ndBodyKinematic* GetSentinelBody() const;
 
-	D_NEWTON_API virtual bool AddBody(ndSharedPtr<ndBody>& body);
-	D_NEWTON_API virtual void AddModel(ndSharedPtr<ndModel>& model);
-	D_NEWTON_API virtual void AddJoint(ndSharedPtr<ndJointBilateralConstraint>& joint);
+	D_NEWTON_API virtual bool AddBody(const ndSharedPtr<ndBody>& body);
+	D_NEWTON_API virtual void AddModel(const ndSharedPtr<ndModel>& model);
+	D_NEWTON_API virtual void AddJoint(const ndSharedPtr<ndJointBilateralConstraint>& joint);
+
+	D_NEWTON_API ndSharedPtr<ndBody> GetBody(ndBody* const body) const;
+	//D_NEWTON_API virtual void GetModel(ndSharedPtr<ndModel>& model);
+	//D_NEWTON_API virtual void GetJoint(ndSharedPtr<ndJointBilateralConstraint>& joint);
 
 	D_NEWTON_API virtual void RemoveBody(ndBody* const body);
 	D_NEWTON_API virtual void RemoveModel(ndModel* const model);
@@ -105,7 +108,6 @@ class ndWorld: public ndClassAlloc
 	D_NEWTON_API ndUnsigned32 GetFrameNumber() const;
 	D_NEWTON_API ndUnsigned32 GetSubFrameNumber() const;
 	D_NEWTON_API ndFloat32 GetAverageUpdateTime() const;
-	D_NEWTON_API ndFloat32 GetExtensionAverageUpdateTime() const;
 
 	D_NEWTON_API ndContactNotify* GetContactNotify() const;
 	D_NEWTON_API void SetContactNotify(ndContactNotify* const notify);
@@ -118,18 +120,22 @@ class ndWorld: public ndClassAlloc
 	D_NEWTON_API bool RayCast(ndRayCastNotify& callback, const ndVector& globalOrigin, const ndVector& globalDest) const;
 	D_NEWTON_API bool ConvexCast(ndConvexCastNotify& callback, const ndShapeInstance& convexShape, const ndMatrix& globalOrigin, const ndVector& globalDest) const;
 
+	D_NEWTON_API void CalculateJointContacts(ndContact* const contact);
+
 	private:
 	void ThreadFunction();
-	void PostUpdate(ndFloat32 timestep);
 	
 	protected:
 	D_NEWTON_API virtual void UpdateSkeletons();
 	D_NEWTON_API virtual void UpdateTransforms();
 	D_NEWTON_API virtual void PostModelTransform();
 
+	D_NEWTON_API virtual void PreUpdate(ndFloat32 timestep);
+	D_NEWTON_API virtual void PostUpdate(ndFloat32 timestep);
+
 	private:
+	//void RemoveModel(ndSharedPtr<ndModel>& model);
 	void RemoveBody(ndSharedPtr<ndBody>& body);
-	void RemoveModel(ndSharedPtr<ndModel>& model);
 	void RemoveJoint(ndSharedPtr<ndJointBilateralConstraint>& joint);
 
 	class dgSolverProgressiveSleepEntry
@@ -161,10 +167,9 @@ class ndWorld: public ndClassAlloc
 	ndJointList m_jointList;
 	ndModelList m_modelList;
 	ndSkeletonList m_skeletonList;
-	ndBodyList m_particleSetList;
-	ndArray<ndBody*> m_deletedBodies;
-	ndArray<ndModel*> m_deletedModels;
-	ndArray<ndJointBilateralConstraint*> m_deletedJoints;
+	ndSpecialList<ndBody> m_deletedBodies;
+	ndSpecialList<ndModel> m_deletedModels;
+	ndSpecialList<ndJointBilateralConstraint> m_deletedJoints;
 	ndArray<ndSkeletonContainer*> m_activeSkeletons;
 	ndSpinLock m_deletedLock;
 
@@ -175,9 +180,6 @@ class ndWorld: public ndClassAlloc
 	ndFloat32 m_averageTimestepAcc;
 	ndFloat32 m_averageFramesCount;
 	ndFloat32 m_lastExecutionTime;
-	ndFloat32 m_extensionAverageUpdateTime;
-	ndFloat32 m_extensionAverageTimestepAcc;
-
 	dgSolverProgressiveSleepEntry m_sleepTable[D_SLEEP_ENTRIES];
 
 	ndInt32 m_subSteps;
@@ -190,10 +192,11 @@ class ndWorld: public ndClassAlloc
 	friend class ndBodyDynamic;
 	friend class ndDynamicsUpdate;
 	friend class ndSkeletonContainer;
+	friend class ndModelArticulation;
 	friend class ndDynamicsUpdateSoa;
 	friend class ndDynamicsUpdateAvx2;
+	friend class ndDynamicsUpdateSycl;
 	friend class ndDynamicsUpdateCuda;
-	friend class ndDynamicsUpdateOpencl;
 } D_GCC_NEWTON_ALIGN_32;
 
 #endif

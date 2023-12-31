@@ -13,7 +13,11 @@
 #include "ndNewtonStdafx.h"
 #include "ndJointGear.h"
 
-D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndJointGear)
+ndJointGear::ndJointGear()
+	:ndJointBilateralConstraint()
+{
+	m_maxDof = 1;
+}
 
 ndJointGear::ndJointGear(ndFloat32 gearRatio,
 	const ndVector& body0Pin, ndBodyKinematic* const body0,
@@ -25,12 +29,12 @@ ndJointGear::ndJointGear(ndFloat32 gearRatio,
 	ndMatrix dommyMatrix;
 
 	// calculate the local matrix for body body0
-	ndMatrix pinAndPivot0(body0Pin);
+	ndMatrix pinAndPivot0(ndGramSchmidtMatrix(body0Pin));
 	CalculateLocalMatrix(pinAndPivot0, m_localMatrix0, dommyMatrix);
 	m_localMatrix0.m_posit = ndVector::m_wOne;
 
 	// calculate the local matrix for body body1  
-	ndMatrix pinAndPivot1(body1Pin);
+	ndMatrix pinAndPivot1(ndGramSchmidtMatrix(body1Pin));
 	CalculateLocalMatrix(pinAndPivot1, dommyMatrix, m_localMatrix1);
 	m_localMatrix1.m_posit = ndVector::m_wOne;
 
@@ -38,27 +42,19 @@ ndJointGear::ndJointGear(ndFloat32 gearRatio,
 	SetSolverModel(m_jointkinematicOpenLoop);
 }
 
-ndJointGear::ndJointGear(const ndLoadSaveBase::ndLoadDescriptor& desc)
-	:ndJointBilateralConstraint(ndLoadSaveBase::ndLoadDescriptor(desc))
-	,m_gearRatio(ndFloat32 (1.0f))
-{
-	const nd::TiXmlNode* const xmlNode = desc.m_rootNode;
-
-	m_gearRatio = xmlGetFloat(xmlNode, "gearRatio");
-}
-
 ndJointGear::~ndJointGear()
 {
 }
 
-void ndJointGear::Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
-{
-	nd::TiXmlElement* const childNode = new nd::TiXmlElement(ClassName());
-	desc.m_rootNode->LinkEndChild(childNode);
-	childNode->SetAttribute("hashId", desc.m_nodeNodeHash);
-	ndJointBilateralConstraint::Save(ndLoadSaveBase::ndSaveDescriptor(desc, childNode));
 
-	xmlSaveParam(childNode, "gearRatio", m_gearRatio);
+ndFloat32 ndJointGear::GetRatio() const
+{
+	return m_gearRatio;
+}
+
+void ndJointGear::SetRatio(ndFloat32 ratio)
+{
+	m_gearRatio = ratio;
 }
 
 void ndJointGear::JacobianDerivative(ndConstraintDescritor& desc)

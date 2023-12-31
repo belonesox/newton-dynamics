@@ -57,7 +57,15 @@
 		{
 		}
 
-		#ifdef D_USE_VECTOR_AVX
+		#ifdef D_SCALAR_VECTOR_CLASS
+			inline ndAvxFloat(const ndVector& low, const ndVector& high)
+				//:m_low(low.m_type)
+				//,m_high(high.m_type)
+			{
+				m_vector8.m_linear = low;
+				m_vector8.m_angular = high;
+			}
+		#elif defined (D_NEWTON_USE_AVX2_OPTION)
 			inline ndAvxFloat(const ndVector& low, const ndVector& high)
 				:m_low(low.m_type)
 				,m_high(high.m_type)
@@ -91,6 +99,13 @@
 			ndAssert(i < D_AVX_WORK_GROUP);
 			const ndFloat32* const ptr = (ndFloat32*)&m_low;
 			return ptr[i];
+		}
+
+		inline ndAvxFloat& operator= (const ndAvxFloat& A)
+		{
+			m_low = A.m_low;
+			m_high = A.m_high;
+			return *this;
 		}
 
 		inline ndAvxFloat operator+ (const ndAvxFloat& A) const
@@ -170,18 +185,28 @@
 
 		inline ndFloat32 GetMax() const
 		{
+			//__m256d tmp0__(_mm256_max_pd(m_low, m_high));
+			//__m128d tmp1__(_mm_max_pd(_mm256_castpd256_pd128(tmp0__), _mm256_extractf128_pd(tmp0__, 1)));
+			//__m128d tmp2__(_mm_max_pd(tmp1__, _mm_unpackhi_pd(tmp1__, tmp1__)));
+			//return _mm_cvtsd_f64(tmp2);
+
 			__m256d tmp0(_mm256_max_pd(m_low, m_high));
-			__m128d tmp1(_mm_max_pd(_mm256_castpd256_pd128(tmp0), _mm256_extractf128_pd(tmp0, 1)));
-			__m128d tmp2(_mm_max_pd(tmp1, _mm_unpackhi_pd(tmp1, tmp1)));
-			return _mm_cvtsd_f64(tmp2);
+			__m256d tmp1(_mm256_max_pd(tmp0, _mm256_permute2f128_pd(tmp0, tmp0, 1)));
+			__m256d tmp2(_mm256_max_pd(tmp1, _mm256_unpackhi_pd(tmp1, tmp1)));
+			return _mm256_cvtsd_f64(tmp2);
 		}
 
 		inline ndFloat32 AddHorizontal() const
 		{
+			//__m256d tmp0(_mm256_add_pd(m_low, m_high));
+			//__m128d tmp1(_mm_add_pd(_mm256_castpd256_pd128(tmp0), _mm256_extractf128_pd(tmp0, 1)));
+			//__m128d tmp2(_mm_hadd_pd(tmp1, tmp1));
+			//return _mm_cvtsd_f64(tmp2);
+
 			__m256d tmp0(_mm256_add_pd(m_low, m_high));
-			__m128d tmp1(_mm_add_pd(_mm256_castpd256_pd128(tmp0), _mm256_extractf128_pd(tmp0, 1)));
-			__m128d tmp2(_mm_hadd_pd(tmp1, tmp1));
-			return _mm_cvtsd_f64(tmp2);
+			__m256d tmp1(_mm256_hadd_pd(tmp0, tmp0));
+			__m256d tmp2(_mm256_add_pd(tmp1, _mm256_permute2f128_pd(tmp1, tmp1, 1)));
+			return _mm256_cvtsd_f64(tmp2);
 		}
 
 		static inline void FlushRegisters()
@@ -311,6 +336,12 @@
 			ndAssert(i < D_AVX_WORK_GROUP);
 			const ndFloat32* const ptr = (ndFloat32*)&m_type;
 			return ptr[i];
+		}
+
+		inline ndAvxFloat& operator= (const ndAvxFloat& A)
+		{
+			m_type = A.m_type;
+			return *this;
 		}
 
 		inline ndAvxFloat operator+ (const ndAvxFloat& A) const
@@ -874,8 +905,7 @@ void ndDynamicsUpdateAvx2::IntegrateBodies()
 			ndBodyKinematic* const body = bodyArray[i];
 			if (!body->m_equilibrium)
 			{
-				body->m_accel = invTime * (body->m_veloc - body->m_accel);
-				body->m_alpha = invTime * (body->m_omega - body->m_alpha);
+				body->SetAcceleration(invTime * (body->m_veloc - body->m_accel), invTime * (body->m_omega - body->m_alpha));
 				body->IntegrateVelocity(timestep);
 			}
 			body->EvaluateSleepState(speedFreeze2, accelFreeze2);
@@ -1008,7 +1038,8 @@ void ndDynamicsUpdateAvx2::GetJacobianDerivatives(ndConstraint* const joint)
 				skeleton0->AddCloseLoopJoint(contactJoint);
 			}
 		}
-		else if (contactJoint->IsSkeletonIntraCollision())
+		//else if (contactJoint->IsSkeletonIntraCollision())
+		else
 		{
 			if (skeleton0 && !skeleton1)
 			{
@@ -1508,7 +1539,7 @@ void ndDynamicsUpdateAvx2::UpdateForceFeedback()
 				rhs->m_jointFeebackForce->m_impact = rhs->m_maxImpact * timestepRK;
 			}
 
-			if (joint->GetAsBilateral())
+			//if (joint->GetAsBilateral())
 			{
 				ndAvxFloat force0(zero);
 				ndAvxFloat force1(zero);
@@ -1521,11 +1552,11 @@ void ndDynamicsUpdateAvx2::UpdateForceFeedback()
 					force0 = force0.MulAdd((ndAvxFloat&)lhs->m_Jt.m_jacobianM0, f);
 					force1 = force1.MulAdd((ndAvxFloat&)lhs->m_Jt.m_jacobianM1, f);
 				}
-				ndJointBilateralConstraint* const bilateral = (ndJointBilateralConstraint*)joint;
-				bilateral->m_forceBody0 = force0.GetLow();
-				bilateral->m_torqueBody0 = force0.GetHigh();
-				bilateral->m_forceBody1 = force1.GetLow();
-				bilateral->m_torqueBody1 = force1.GetHigh();
+				//ndJointBilateralConstraint* const bilateral = (ndJointBilateralConstraint*)joint;
+				joint->m_forceBody0 = force0.GetLow();
+				joint->m_torqueBody0 = force0.GetHigh();
+				joint->m_forceBody1 = force1.GetLow();
+				joint->m_torqueBody1 = force1.GetHigh();
 			}
 		}
 	});
@@ -1689,8 +1720,9 @@ void ndDynamicsUpdateAvx2::IntegrateBodiesVelocity()
 			ndBodyKinematic* const body = bodyArray[i];
 
 			ndAssert(body);
-			ndAssert(body->GetAsBodyDynamic());
 			ndAssert(body->m_isConstrained);
+			// no necessary anymore because the virtual function handle it.
+			//ndAssert(body->GetAsBodyDynamic());
 			const ndInt32 index = body->m_index;
 			const ndJacobian& forceAndTorque = internalForces[index];
 			const ndVector force(body->GetForce() + forceAndTorque.m_linear);

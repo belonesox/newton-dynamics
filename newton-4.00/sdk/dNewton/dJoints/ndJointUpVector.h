@@ -15,12 +15,13 @@
 #include "ndNewtonStdafx.h"
 #include "ndJointBilateralConstraint.h"
 
-// This joint is useful to for implementing character controllers, and also precise object picking
+// This joint is useful to for implementing simple character controllers
 class ndJointUpVector: public ndJointBilateralConstraint
 {
 	public:
-	D_CLASS_REFLECTION(ndJointUpVector);
-	D_NEWTON_API ndJointUpVector(const ndLoadSaveBase::ndLoadDescriptor& desc);
+	D_CLASS_REFLECTION(ndJointUpVector, ndJointBilateralConstraint)
+
+	D_NEWTON_API ndJointUpVector();
 	D_NEWTON_API ndJointUpVector(const ndVector& normal, ndBodyKinematic* const child, ndBodyKinematic* const parent);
 	D_NEWTON_API virtual ~ndJointUpVector();
 
@@ -28,7 +29,6 @@ class ndJointUpVector: public ndJointBilateralConstraint
 
 	protected:
 	D_NEWTON_API void JacobianDerivative(ndConstraintDescritor& desc);
-	D_NEWTON_API void Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const;
 };
 
 #endif

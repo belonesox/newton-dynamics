@@ -73,17 +73,19 @@ class ndScene : public ndThreadPool
 
 	public:
 	D_COLLISION_API virtual ~ndScene();
-	D_COLLISION_API virtual bool AddBody(ndSharedPtr<ndBody>& body);
-	D_COLLISION_API virtual bool RemoveBody(ndBodyKinematic* const body);
+	D_COLLISION_API virtual bool AddBody(const ndSharedPtr<ndBody>& body);
+	D_COLLISION_API virtual bool RemoveBody(const ndSharedPtr<ndBody>& body);
+
+	D_COLLISION_API ndSharedPtr<ndBody> GetBody(ndBody* const body) const;
 
 	D_COLLISION_API virtual void Begin();
 	D_COLLISION_API virtual void End();
 	D_COLLISION_API virtual void Sync();
-	D_COLLISION_API virtual bool IsGPU() const;
+	D_COLLISION_API virtual bool IsHighPerformanceCompute() const;
 	D_COLLISION_API virtual bool IsValid() const;
-	D_COLLISION_API virtual double GetGPUTime() const;
 
 	D_COLLISION_API virtual void Cleanup();
+	D_COLLISION_API virtual void PrepareCleanup();
 
 	D_COLLISION_API ndContactNotify* GetContactNotify() const;
 	D_COLLISION_API void SetContactNotify(ndContactNotify* const notify);
@@ -100,6 +102,7 @@ class ndScene : public ndThreadPool
 
 	virtual ndWorld* GetWorld() const;
 	const ndBodyListView& GetBodyList() const;
+	const ndBodyList& GetParticleList() const;
 
 	ndArray<ndBodyKinematic*>& GetActiveBodyArray();
 	const ndArray<ndBodyKinematic*>& GetActiveBodyArray() const;
@@ -147,7 +150,12 @@ class ndScene : public ndThreadPool
 	D_COLLISION_API virtual void CalculateContacts(ndInt32 threadIndex, ndContact* const contact);
 	D_COLLISION_API virtual void UpdateTransformNotify(ndInt32 threadIndex, ndBodyKinematic* const body);
 
+	D_COLLISION_API virtual void ParticleUpdate(ndFloat32 timestep);
+	D_COLLISION_API virtual bool AddParticle(const ndSharedPtr<ndBody>& particle);
+	D_COLLISION_API virtual bool RemoveParticle(const ndSharedPtr<ndBody>& particle);
+
 	ndBodyListView m_bodyList;
+	ndBodyList m_particleSetList;
 	ndContactArray m_contactArray;
 	ndBvhSceneManager m_bvhSceneManager;
 	ndArray<ndUnsigned8> m_scratchBuffer;
@@ -183,19 +191,18 @@ class ndScene : public ndThreadPool
 	friend class ndSkeletonContainer;
 } D_GCC_NEWTON_ALIGN_32 ;
 
+inline void ndScene::PrepareCleanup()
+{
+}
+
 inline bool ndScene::IsValid() const
 {
 	return true;
 }
 
-inline bool ndScene::IsGPU() const
+inline bool ndScene::IsHighPerformanceCompute() const
 {
 	return false;
-}
-
-inline double ndScene::GetGPUTime() const
-{
-	return 0.0;
 }
 
 inline ndWorld* ndScene::GetWorld() const
@@ -212,6 +219,11 @@ inline ndInt32 ndScene::GetThreadCount() const
 inline ndArray<ndUnsigned8>& ndScene::GetScratchBuffer()
 {
 	return m_scratchBuffer;
+}
+
+inline const ndBodyList& ndScene::GetParticleList() const
+{
+	return m_particleSetList;
 }
 
 inline const ndBodyListView& ndScene::GetBodyList() const

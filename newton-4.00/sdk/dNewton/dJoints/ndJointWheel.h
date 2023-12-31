@@ -31,9 +31,6 @@ class ndWheelDescriptor
 	{
 	}
 	
-	D_NEWTON_API void Save(nd::TiXmlNode* const xmlNode) const;
-	D_NEWTON_API void Load(const nd::TiXmlNode* const xmlNode);
-	
 	ndFloat32 m_radios;
 	ndFloat32 m_springK;
 	ndFloat32 m_damperC;
@@ -45,11 +42,13 @@ class ndWheelDescriptor
 	ndFloat32 m_steeringAngle;
 };
 
-class ndJointWheel: public ndJointBilateralConstraint, public ndJointBilateralConstraint::ndIkInterface
+//class ndJointWheel: public ndJointBilateralConstraint, public ndJointBilateralConstraint::ndIkInterface
+class ndJointWheel : public ndJointBilateralConstraint
 {
 	public:
-	D_CLASS_REFLECTION(ndJointWheel);
-	D_NEWTON_API ndJointWheel(const ndLoadSaveBase::ndLoadDescriptor& desc);
+	D_CLASS_REFLECTION(ndJointWheel, ndJointBilateralConstraint)
+
+	D_NEWTON_API ndJointWheel();
 	D_NEWTON_API ndJointWheel(const ndMatrix& pinAndPivotFrame, ndBodyKinematic* const child, ndBodyKinematic* const parent, const ndWheelDescriptor& desc);
 	D_NEWTON_API virtual ~ndJointWheel();
 
@@ -67,7 +66,6 @@ class ndJointWheel: public ndJointBilateralConstraint, public ndJointBilateralCo
 
 	protected:
 	D_NEWTON_API void JacobianDerivative(ndConstraintDescritor& desc);
-	D_NEWTON_API void Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const;
 
 	ndMatrix m_baseFrame;
 	ndWheelDescriptor m_info;

@@ -30,51 +30,75 @@
 #include "ndCudaSceneInfo.h"
 #include "ndWorldSceneCuda.h"
 #include "ndDynamicsUpdate.h"
-#include "ndBodyParticleSet.h"
 #include "ndJointBilateralConstraint.h"
 
 ndWorldSceneCuda::ndWorldSceneCuda(const ndWorldScene& src)
 	:ndWorldScene(src)
-	,ndCudaContext()
+	,m_fluidParticles()
 {
+	m_context = new ndCudaContext();
+
+	const ndBodyList& particles = GetParticleList();
+	for (ndBodyList::ndNode* node = particles.GetFirst(); node; node = node->GetNext())
+	{
+		ndBody* const body = *node->GetInfo();
+		ndBodySphFluid* const particle = body->GetAsBodySphFluid();
+		if (particle)
+		{
+			//m_fluidParticles.Append(new ndCudaSphFluid(particle));
+			Addparticle(particle);
+		}
+	}
 }
 
 ndWorldSceneCuda::~ndWorldSceneCuda()
 {
-}
+	for (ndSpecialList<ndCudaSphFluid>::ndNode* node = m_fluidParticles.GetFirst(); node; node = node->GetNext())
+	{
+		delete node->GetInfo();
+	}
 
-ndCudaContext* ndWorldSceneCuda::GetContext()
-{
-	return this;
+	if (m_context)
+	{
+		delete m_context;
+	}
 }
 
 bool ndWorldSceneCuda::IsValid() const
 {
-	return ndCudaContext::IsValid();
-}
-
-bool ndWorldSceneCuda::IsGPU() const
-{
-	return ndCudaContext::IsValid();
-}
-
-double ndWorldSceneCuda::GetGPUTime() const
-{
-	return ndCudaContext::GetGPUTime();
+	return m_context->IsValid();
 }
 
 void ndWorldSceneCuda::Begin()
 {
 	ndWorldScene::Begin();
-	ndCudaContext::Begin();
+	m_context->Begin();
 }
 
 void ndWorldSceneCuda::End()
 {
-	ndCudaContext::End();
+	m_context->End();
 	ndWorldScene::End();
 }
 
+void ndWorldSceneCuda::Cleanup()
+{
+	m_context->Cleanup();
+	ndWorldScene::Cleanup();
+}
+
+void ndWorldSceneCuda::PrepareCleanup()
+{
+	m_context->PrepareCleanup();
+	ndWorldScene::PrepareCleanup();
+}
+
+bool ndWorldSceneCuda::IsHighPerformanceCompute() const
+{
+	return true;
+}
+
+#if 0
 void ndWorldSceneCuda::LoadBodyData()
 {
 	auto CopyBodies = ndMakeObject::ndFunction([this](ndInt32 threadIndex, ndInt32 threadCount)
@@ -177,30 +201,6 @@ void ndWorldSceneCuda::GetBodyTransforms()
 	////gpuBuffer.WriteData(&cpuBuffer[0], cpuBuffer.GetCount() - 1, stream);
 }
 
-void ndWorldSceneCuda::UpdateTransform()
-{
-	D_TRACKTIME();
-	ndCudaContext::UpdateTransform();
-	auto SetTransform = ndMakeObject::ndFunction([this](ndInt32 threadIndex, ndInt32 threadCount)
-	{
-		D_TRACKTIME();
-		const ndArray<ndBodyKinematic*>& bodyArray = GetActiveBodyArray();
-		const ndCudaSpatialVector* const data = GetTransformBuffer();
-		const ndStartEnd startEnd(bodyArray.GetCount() - 1, threadIndex, threadCount);
-		for (ndInt32 i = startEnd.m_start; i < startEnd.m_end; ++i)
-		{
-			ndBodyKinematic* const body = bodyArray[i];
-			const ndCudaSpatialVector& transform = data[i];
-			const ndVector position(transform.m_linear.x, transform.m_linear.y, transform.m_linear.z, ndFloat32(1.0f));
-			const ndQuaternion rotation(ndVector(transform.m_angular.x, transform.m_angular.y, transform.m_angular.z, transform.m_angular.w));
-			body->SetMatrixAndCentreOfMass(rotation, position);
-			
-			body->m_transformIsDirty = true;
-			UpdateTransformNotify(threadIndex, body);
-		}
-	});
-	ParallelExecute(SetTransform);
-}
 
 
 void ndWorldSceneCuda::BalanceScene()
@@ -241,3 +241,111 @@ void ndWorldSceneCuda::InitBodyArray()
 	ndWorldScene::InitBodyArray();
 	ndCudaContext::InitBodyArray();
 }
+
+void ndWorldSceneCuda::CalculateContacts(ndInt32, ndContact* const)
+{
+	ndAssert(0);
+}
+#endif
+
+void ndWorldSceneCuda::Addparticle(ndBodySphFluid* const particle)
+{
+	ndAssert(0);
+	//ndSphFluidInitInfo info;
+	//info.m_owner = particle;
+	//info.m_context = m_context;
+	//info.m_owner = particle;
+	//info.m_gridSize = particle->GetSphGridSize();
+	//
+	//ndCudaSphFluid* const fluid = new ndCudaSphFluid(info);
+	//m_fluidParticles.Append(fluid);
+	//
+	//const ndArray<ndVector>& posit = particle->GetPositions();
+	//fluid->MemCpy(&posit[0].m_x, sizeof(ndVector) / sizeof(ndFloat32), posit.GetCount());
+}
+
+bool ndWorldSceneCuda::AddParticle(ndSharedPtr<ndBody>& particle)
+{
+	bool ret = ndWorldScene::AddParticle(particle);
+
+	ndBodySphFluid* const fluid = particle->GetAsBodySphFluid();
+	if (fluid)
+	{
+		Addparticle(fluid);
+	}
+	else
+	{
+		ndAssert(0);
+	}
+
+	return ret;
+}
+
+bool ndWorldSceneCuda::RemoveParticle(ndSharedPtr<ndBody>& particle)
+{
+	ndBodySphFluid* const fluid = particle->GetAsBodySphFluid();
+	if (fluid)
+	{
+		for (ndSpecialList<ndCudaSphFluid>::ndNode* node = m_fluidParticles.GetFirst(); node; node = node->GetNext())
+		{
+			if (node->GetInfo()->GetOwner() == fluid)
+			{
+				delete node->GetInfo();
+				m_fluidParticles.Remove(node);
+				break;
+			}
+		}
+	}
+	else
+	{
+		ndAssert(0);
+	}
+
+	bool ret = ndWorldScene::RemoveParticle(particle);
+	return ret;
+}
+
+void ndWorldSceneCuda::UpdateTransform()
+{
+	D_TRACKTIME();
+	for (ndSpecialList<ndCudaSphFluid>::ndNode* node = m_fluidParticles.GetFirst(); node; node = node->GetNext())
+	{
+		ndCudaSphFluid* const fluid = node->GetInfo();
+		ndBodySphFluid* const owner = fluid->GetOwner();
+		ndArray<ndVector>& posit = owner->GetPositions();
+		fluid->GetPositions(&posit[0].m_x, sizeof(ndVector) / sizeof(ndFloat32), posit.GetCount());
+	}
+
+	//m_context->UpdateTransform();
+	//auto SetTransform = ndMakeObject::ndFunction([this](ndInt32 threadIndex, ndInt32 threadCount)
+	//{
+	//	D_TRACKTIME();
+	//	const ndArray<ndBodyKinematic*>& bodyArray = GetActiveBodyArray();
+	//	const ndCudaSpatialVector* const data = GetTransformBuffer();
+	//	const ndStartEnd startEnd(bodyArray.GetCount() - 1, threadIndex, threadCount);
+	//	for (ndInt32 i = startEnd.m_start; i < startEnd.m_end; ++i)
+	//	{
+	//		ndBodyKinematic* const body = bodyArray[i];
+	//		const ndCudaSpatialVector& transform = data[i];
+	//		const ndVector position(transform.m_linear.x, transform.m_linear.y, transform.m_linear.z, ndFloat32(1.0f));
+	//		const ndQuaternion rotation(ndVector(transform.m_angular.x, transform.m_angular.y, transform.m_angular.z, transform.m_angular.w));
+	//		body->SetMatrixAndCentreOfMass(rotation, position);
+	//
+	//		body->m_transformIsDirty = true;
+	//		UpdateTransformNotify(threadIndex, body);
+	//	}
+	//});
+	//ParallelExecute(SetTransform);
+
+	ndWorldScene::UpdateTransform();
+}
+
+void ndWorldSceneCuda::ParticleUpdate(ndFloat32 timestep)
+{
+	for (ndSpecialList<ndCudaSphFluid>::ndNode* node = m_fluidParticles.GetFirst(); node; node = node->GetNext())
+	{
+		ndCudaSphFluid* const fluid = node->GetInfo();
+		fluid->Update(timestep);
+	}
+}
+

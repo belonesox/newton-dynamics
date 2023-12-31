@@ -13,8 +13,8 @@
 #include "ndSkyBox.h"
 #include "ndUIEntity.h"
 #include "ndDemoMesh.h"
+#include "ndMeshLoader.h"
 #include "ndDemoCamera.h"
-#include "ndLoadFbxMesh.h"
 #include "ndPhysicsUtils.h"
 #include "ndPhysicsWorld.h"
 #include "ndMakeStaticMap.h"
@@ -40,14 +40,15 @@ namespace ndAdvancedRobot
 		ndFloat32 m_mass;
 		ndFloat32 m_minLimit;
 		ndFloat32 m_maxLimit;
+		ndFloat32 m_maxStrength;
 	};
 
 	static ndDefinition jointsDefinition[] =
 	{
 		{ "base", ndDefinition::m_root, 100.0f, 0.0f, 0.0f},
-		{ "base_rotator", ndDefinition::m_hinge, 50.0f, -1.0e10f, 1.0e10f},
-		{ "arm_0", ndDefinition::m_hinge , 5.0f, -140.0f * ndDegreeToRad, 1.0f * ndDegreeToRad},
-		{ "arm_1", ndDefinition::m_hinge , 5.0f, -30.0f * ndDegreeToRad, 120.0f * ndDegreeToRad},
+		{ "base_rotator", ndDefinition::m_hinge, 50.0f, -1.0e10f, 1.0e10f, 5.0e4f},
+		{ "arm_0", ndDefinition::m_hinge , 5.0f, -140.0f * ndDegreeToRad, 1.0f * ndDegreeToRad, 5.0e4f},
+		{ "arm_1", ndDefinition::m_hinge , 5.0f, -30.0f * ndDegreeToRad, 110.0f * ndDegreeToRad},
 		{ "arm_2", ndDefinition::m_hinge , 5.0f, -1.0e10f, 1.0e10f},
 		{ "arm_3", ndDefinition::m_hinge , 3.0f, -1.0e10f, 1.0e10f},
 		{ "arm_4", ndDefinition::m_hinge , 2.0f, -1.0e10f, 1.0e10f},
@@ -56,10 +57,11 @@ namespace ndAdvancedRobot
 		{ "effector", ndDefinition::m_effector , 0.0f, 0.0f, 0.0f},
 	};
 
+#if 0
 	class ndIndustrialRobot : public ndModel
 	{
 		public:
-		D_CLASS_REFLECTION(ndAdvancedRobot::ndIndustrialRobot);
+		D_CLASS_REFLECTION(ndAdvancedRobot::ndIndustrialRobot, ndBodyDynamic)
 
 		ndIndustrialRobot(ndDemoEntityManager* const scene, ndDemoEntity* const robotMesh, const ndMatrix& location)
 			:ndModel()
@@ -128,6 +130,15 @@ namespace ndAdvancedRobot
 							// here we use a ik joints instead of a regular one.
 							ndIkJointHinge* const hinge = new ndIkJointHinge(pivotMatrix, childBody, parentBody);
 							hinge->SetLimits(definition.m_minLimit, definition.m_maxLimit);
+							if ((definition.m_minLimit > -1000.0f) && (definition.m_maxLimit < 1000.0f))
+							{
+								hinge->SetLimitState(true);
+							}
+
+							if (definition.m_maxStrength != 0.0f)
+							{
+								hinge->SetMaxTorque(definition.m_maxStrength);
+							}
 							m_jointArray.PushBack(hinge);
 
 							ndSharedPtr<ndJointBilateralConstraint> hingePtr(hinge);
@@ -142,6 +153,7 @@ namespace ndAdvancedRobot
 							const ndMatrix pivotMatrix(childBody->GetMatrix());
 							ndJointSlider* const slider = new ndJointSlider(pivotMatrix, childBody, parentBody);
 							slider->SetLimits(definition.m_minLimit, definition.m_maxLimit);
+							slider->SetLimitState(true);
 							slider->SetAsSpringDamper(0.01f, 2000.0f, 100.0f);
 			
 							if (!strstr(definition.m_boneName, "Left"))
@@ -169,7 +181,7 @@ namespace ndAdvancedRobot
 			
 							ndFloat32 relaxation = 0.003f;
 							m_effector->EnableRotationAxis(ndIk6DofEffector::m_shortestPath);
-							m_effector->SetLinearSpringDamper(relaxation, 1500.0f, 100.0f);
+							m_effector->SetLinearSpringDamper(relaxation, 1500.0f, 200.0f);
 							m_effector->SetAngularSpringDamper(relaxation, 1500.0f, 100.0f);
 							m_effector->SetMaxForce(10000.0f);
 							m_effector->SetMaxTorque(10000.0f);
@@ -190,131 +202,8 @@ namespace ndAdvancedRobot
 			}
 		}
 
-		ndIndustrialRobot(const ndLoadSaveBase::ndLoadDescriptor& desc)
-			:ndModel(ndLoadSaveBase::ndLoadDescriptor(desc))
-			,m_rootBody(nullptr)
-			,m_leftGripper(nullptr)
-			,m_rightGripper(nullptr)
-			,m_effector()
-			,m_invDynamicsSolver()
-			,m_effectorOffset(ndVector::m_wOne)
-			,m_x(0.0f)
-			,m_y(0.0f)
-			,m_azimuth(0.0f)
-			,m_gripperPosit(0.0f)
-			,m_pitch(0.0f)
-			,m_yaw(0.0f)
-			,m_roll(0.0f)
-		{
-			const nd::TiXmlNode* const modelRootNode = desc.m_rootNode;
-
-			const nd::TiXmlNode* const bodies = modelRootNode->FirstChild("bodies");
-			for (const nd::TiXmlNode* node = bodies->FirstChild(); node; node = node->NextSibling())
-			{
-				ndInt32 hashId;
-				const nd::TiXmlElement* const element = (nd::TiXmlElement*) node;
-				element->Attribute("int32", &hashId);
-				ndBodyLoaderCache::ndNode* const bodyNode = desc.m_bodyMap->Find(hashId);
-
-				ndBody* const body = (ndBody*)bodyNode->GetInfo();
-				m_bodyArray.PushBack(body->GetAsBodyDynamic());
-			}
-
-			const nd::TiXmlNode* const joints = modelRootNode->FirstChild("joints");
-			for (const nd::TiXmlNode* node = joints->FirstChild(); node; node = node->NextSibling())
-			{
-				ndInt32 hashId;
-				const nd::TiXmlElement* const element = (nd::TiXmlElement*) node;
-				element->Attribute("int32", &hashId);
-				ndJointLoaderCache::ndNode* const jointNode = desc.m_jointMap->Find(hashId);
-
-				ndJointBilateralConstraint* const joint = (ndJointBilateralConstraint*)jointNode->GetInfo();
-				m_jointArray.PushBack((ndJointHinge*)joint);
-			}
-
-			// load root body
-			ndBodyLoaderCache::ndNode* const rootBodyNode = desc.m_bodyMap->Find(xmlGetInt(modelRootNode, "rootBodyHash"));
-			ndBody* const rootbody = (ndBody*)rootBodyNode->GetInfo();
-			m_rootBody = rootbody->GetAsBodyDynamic();
-
-			// load effector joint
-			const nd::TiXmlNode* const endEffectorNode = modelRootNode->FirstChild("endEffector");
-			if (xmlGetInt(endEffectorNode, "hasEffector"))
-			{
-				ndAssert(0);
-				//ndBodyLoaderCache::ndNode* const effectorBodyNode0 = desc.m_bodyMap->Find(xmlGetInt(endEffectorNode, "body0Hash"));
-				//ndBodyLoaderCache::ndNode* const effectorBodyNode1 = desc.m_bodyMap->Find(xmlGetInt(endEffectorNode, "body1Hash"));
-				//
-				//ndBody* const body0 = (ndBody*)effectorBodyNode0->GetInfo();
-				//ndBody* const body1 = (ndBody*)effectorBodyNode1->GetInfo();
-				//ndAssert(body1 == m_rootBody);
-				//
-				//const ndMatrix pivotMatrix(body0->GetMatrix());
-				//m_effector = new ndIk6DofEffector(pivotMatrix, body0->GetAsBodyDynamic(), body1->GetAsBodyDynamic());
-				//m_effector->EnableRotationAxis(ndIk6DofEffector::m_shortestPath);
-				//ndFloat32 regularizer;
-				//ndFloat32 springConst;
-				//ndFloat32 damperConst;
-				//
-				//m_effector->GetLinearSpringDamper(regularizer, springConst, damperConst);
-				//m_effector->SetLinearSpringDamper(regularizer * 0.5f, springConst * 10.0f, damperConst * 10.0f);
-				//
-				//m_effector->GetAngularSpringDamper(regularizer, springConst, damperConst);
-				//m_effector->SetAngularSpringDamper(regularizer * 0.5f, springConst * 10.0f, damperConst * 10.0f);
-			}
-		}
-
 		~ndIndustrialRobot()
 		{
-		}
-
-		void Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
-		{
-			nd::TiXmlElement* const modelRootNode = new nd::TiXmlElement(ClassName());
-			desc.m_rootNode->LinkEndChild(modelRootNode);
-			modelRootNode->SetAttribute("hashId", desc.m_nodeNodeHash);
-			ndModel::Save(ndLoadSaveBase::ndSaveDescriptor(desc, modelRootNode));
-
-			// save all bodies.
-			nd::TiXmlElement* const bodiesNode = new nd::TiXmlElement("bodies");
-			modelRootNode->LinkEndChild(bodiesNode);
-			for (ndInt32 i = 0; i < m_bodyArray.GetCount(); ++i)
-			{
-				nd::TiXmlElement* const paramNode = new nd::TiXmlElement("body");
-				bodiesNode->LinkEndChild(paramNode);
-
-				ndTree<ndInt32, const ndBodyKinematic*>::ndNode* const bodyPartNode = desc.m_bodyMap->Insert(desc.m_bodyMap->GetCount(), m_bodyArray[i]);
-				paramNode->SetAttribute("int32", bodyPartNode->GetInfo());
-			}
-
-			// save all joints
-			nd::TiXmlElement* const jointsNode = new nd::TiXmlElement("joints");
-			modelRootNode->LinkEndChild(jointsNode);
-			for (ndInt32 i = 0; i < m_jointArray.GetCount(); ++i)
-			{
-				nd::TiXmlElement* const paramNode = new nd::TiXmlElement("joint");
-				jointsNode->LinkEndChild(paramNode);
-
-				ndTree<ndInt32, const ndJointBilateralConstraint*>::ndNode* const jointPartNode = desc.m_jointMap->Insert(desc.m_jointMap->GetCount(), m_jointArray[i]);
-				paramNode->SetAttribute("int32", jointPartNode->GetInfo());
-			}
-
-			// indicate which body is the root
-			xmlSaveParam(modelRootNode, "rootBodyHash", desc.m_bodyMap->Find(m_rootBody)->GetInfo());
-
-			// save end effector info
-			nd::TiXmlElement* const endEffectorNode = new nd::TiXmlElement("endEffector");
-			modelRootNode->LinkEndChild(endEffectorNode);
-
-			xmlSaveParam(endEffectorNode, "hasEffector", *m_effector ? 1 : 0);
-			if (*m_effector)
-			{
-				ndJointBilateralConstraint* const effectJoint = (ndJointBilateralConstraint*)*m_effector;
-				ndTree<ndInt32, const ndBodyKinematic*>::ndNode* const effectBody0 = desc.m_bodyMap->Find(effectJoint->GetBody0());
-				ndTree<ndInt32, const ndBodyKinematic*>::ndNode* const effectBody1 = desc.m_bodyMap->Find(effectJoint->GetBody1());
-				xmlSaveParam(endEffectorNode, "body0Hash", effectBody0->GetInfo());
-				xmlSaveParam(endEffectorNode, "body1Hash", effectBody1->GetInfo());
-			}
 		}
 
 		ndBodyDynamic* CreateBodyPart(ndDemoEntityManager* const scene, ndDemoEntity* const entityPart, ndFloat32 mass, ndBodyDynamic* const parentBone)
@@ -417,7 +306,6 @@ namespace ndAdvancedRobot
 		ndReal m_yaw;
 		ndReal m_roll;
 	};
-	D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndAdvancedRobot::ndIndustrialRobot);
 
 	class ndRobotUI : public ndUIEntity
 	{
@@ -469,48 +357,59 @@ namespace ndAdvancedRobot
 
 		ndIndustrialRobot* m_robot;
 	};
-};
+#endif
+}
 
 using namespace ndAdvancedRobot;
 void ndAdvancedIndustrialRobot(ndDemoEntityManager* const scene)
 {
 	// build a floor
+	ndMeshLoader loader;
+	//ndBodyKinematic* const floor = BuildFloorBox(scene, ndGetIdentityMatrix());
 	BuildFloorBox(scene, ndGetIdentityMatrix());
-	
-	ndVector origin1(0.0f, 0.0f, 0.0f, 1.0f);
-	ndDemoEntity* const robotEntity = ndDemoEntity::LoadFbx("robot.fbx", scene);
-	
-	ndWorld* const world = scene->GetWorld();
-	ndMatrix matrix(ndYawMatrix(-90.0f * ndDegreeToRad));
-	ndIndustrialRobot* const robot = new ndIndustrialRobot(scene, robotEntity, matrix);
-	scene->SetSelectedModel(robot);
+	ndSharedPtr<ndDemoEntity> robotEntity(loader.LoadEntity("robot.fbx", scene));
 
-	ndSharedPtr<ndModel> robotPtr(robot);
-	ndSharedPtr<ndJointBilateralConstraint> fixJoint(new ndJointFix6dof(robot->GetRoot()->GetMatrix(), robot->GetRoot(), world->GetSentinelBody()));
-	world->AddModel(robotPtr);
-	world->AddJoint(fixJoint);
-	
-	ndRobotUI* const robotUI = new ndRobotUI(scene, robot);
-	ndSharedPtr<ndUIEntity> robotUIPtr(robotUI);
-	scene->Set2DDisplayRenderFunction(robotUIPtr);
+	ndVector origin1(0.0f, 0.0f, 0.0f, 1.0f);
+	ndAssert(0);
+	//ndWorld* const world = scene->GetWorld();
+	ndMatrix matrix(ndYawMatrix(-90.0f * ndDegreeToRad));
+	//ndIndustrialRobot* const robot = new ndIndustrialRobot(scene, *robotEntity, matrix);
+	//scene->SetSelectedModel(robot);
+	//
+	//ndSharedPtr<ndModel> robotPtr(robot);
+	////ndSharedPtr<ndJointBilateralConstraint> fixJoint(new ndJointFix6dof(robot->GetRoot()->GetMatrix(), robot->GetRoot(), world->GetSentinelBody()));
+	//ndSharedPtr<ndJointBilateralConstraint> fixJoint(new ndJointFix6dof(robot->GetRoot()->GetMatrix(), robot->GetRoot(), floor));
+	//world->AddModel(robotPtr);
+	//world->AddJoint(fixJoint);
+	//
+	//ndRobotUI* const robotUI = new ndRobotUI(scene, robot);
+	//ndSharedPtr<ndUIEntity> robotUIPtr(robotUI);
+	//scene->Set2DDisplayRenderFunction(robotUIPtr);
 	
 	//matrix.m_posit.m_x += 2.0f;
 	//matrix.m_posit.m_z -= 2.0f;
 	//ndSharedPtr<ndUIEntity> robotUIPtr1(new ndIndustrialRobot(scene, robotEntity, matrix));
 	//world->AddModel(robotUIPtr1);
+	//delete robotEntity;
 	
-	delete robotEntity;
+	//ndMatrix location(matrix * ndYawMatrix(45.0f * ndDegreeToRad));
+	//location.m_posit.m_z += 1.75f;
+	//location.m_posit.m_x += 1.75f;
+	//AddBox(scene, location, 10.0f, 2.0f, 0.5f, 2.0f);
 	
-	ndMatrix location(matrix);
-	location.m_posit.m_x += 1.5f;
-	location.m_posit.m_z += 1.5f;
-	AddBox(scene, location, 2.0f, 0.3f, 0.4f, 0.7f);
-	AddBox(scene, location, 1.0f, 0.3f, 0.4f, 0.7f);
-	
-	location.m_posit.m_x += 0.6f;
-	location.m_posit.m_z += 0.2f;
-	AddBox(scene, location, 8.0f, 0.3f, 0.4f, 0.7f);
-	AddBox(scene, location, 4.0f, 0.3f, 0.4f, 0.7f);
+	//ndMatrix location(matrix * ndYawMatrix(0.0f * ndDegreeToRad));
+	//location.m_posit.m_x += 1.5f;
+	//location.m_posit.m_z += 1.5f;
+	//AddBox(scene, location, 2.0f, 0.3f, 0.4f, 0.7f);
+	//location = ndYawMatrix(60.0f * ndDegreeToRad) * location;
+	//AddBox(scene, location, 1.0f, 0.3f, 0.4f, 0.7f);
+	//
+	//location = ndYawMatrix(60.0f * ndDegreeToRad) * location;
+	//location.m_posit.m_x += 1.0f;
+	//location.m_posit.m_z += 0.5f;
+	//AddBox(scene, location, 8.0f, 0.3f, 0.4f, 0.7f);
+	//location = ndYawMatrix(45.0f * ndDegreeToRad) * location;
+	//AddBox(scene, location, 4.0f, 0.3f, 0.4f, 0.7f);
 	
 	matrix.m_posit.m_x -= 6.0f;
 	matrix.m_posit.m_y += 2.0f;

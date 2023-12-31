@@ -24,6 +24,7 @@
 
 #include "ndCollisionStdafx.h"
 #include "ndShapeInstance.h"
+#include "ndBodyListView.h"
 
 class ndContact;
 class ndBodyNotify;
@@ -42,9 +43,8 @@ D_MSV_NEWTON_ALIGN_32
 class ndBody : public ndContainersFreeListAlloc<ndBody>
 {
 	public:
-	D_CLASS_REFLECTION(ndBody);
+	D_BASE_CLASS_REFLECTION(ndBody)
 	D_COLLISION_API ndBody();
-	D_COLLISION_API ndBody(const ndLoadSaveBase::ndLoadDescriptor& desc);
 	D_COLLISION_API virtual ~ndBody();
 
 	virtual ndBody* GetAsBody() { return this;}
@@ -79,8 +79,6 @@ class ndBody : public ndContainersFreeListAlloc<ndBody>
 	D_COLLISION_API virtual void SetOmega(const ndVector& veloc);
 	D_COLLISION_API virtual void SetVelocity(const ndVector& veloc);
 	D_COLLISION_API virtual void SetMatrix(const ndMatrix& matrix);
-		
-	D_COLLISION_API virtual void Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const;
 	D_COLLISION_API ndVector GetVelocityAtPoint(const ndVector& point) const;
 
 	D_COLLISION_API void SetOmegaNoSleep(const ndVector& veloc);
@@ -89,8 +87,6 @@ class ndBody : public ndContainersFreeListAlloc<ndBody>
 	D_COLLISION_API void SetMatrixAndCentreOfMass(const ndQuaternion& rotation, const ndVector& globalcom);
 
 	protected:
-	D_COLLISION_API static const nd::TiXmlNode* FindNode(const nd::TiXmlNode* const rootNode, const char* const name);
-
 	virtual void AttachContact(ndContact* const) {}
 	virtual void DetachContact(ndContact* const) {}
 	virtual ndContact* FindContact(const ndBody* const) const { return nullptr; }
@@ -104,6 +100,7 @@ class ndBody : public ndContainersFreeListAlloc<ndBody>
 	ndVector m_maxAabb;
 	ndQuaternion m_rotation;
 	ndBodyNotify* m_notifyCallback;
+	ndSpecialList<ndBody>::ndNode* m_deletedNode;
 
 	ndUnsigned32 m_uniqueId;
 	union
@@ -130,7 +127,6 @@ class ndBody : public ndContainersFreeListAlloc<ndBody>
 	ndUnsigned8 m_isConstrained;
 	ndUnsigned8 m_sceneForceUpdate;
 	ndUnsigned8 m_sceneEquilibrium;
-	ndUnsigned8 m_markedForRemoved;
 	
 	D_COLLISION_API static ndUnsigned32 m_uniqueIdCount;
 

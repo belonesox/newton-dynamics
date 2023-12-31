@@ -57,6 +57,7 @@ if(DEFINED ENV{Python})
 	target_link_directories(${projectName} BEFORE PRIVATE "$ENV{Python}/Libs")
 else()
 	find_package (Python COMPONENTS Development REQUIRED)
+	#message ("${Python_LIBRARIES}")
 	target_include_directories(${projectName} PUBLIC ${Python_INCLUDE_DIRS})
 	target_link_libraries(${projectName} ${Python_LIBRARIES})
 endif()
@@ -73,6 +74,10 @@ endif()
 
 if (NEWTON_ENABLE_CUDA_SOLVER)
 	target_link_libraries (${projectName} ndSolverCuda)
+endif()
+
+if (NEWTON_ENABLE_SYCL_SOLVER)
+	target_link_libraries (${projectName} ndSolverSycl)
 endif()
 
 if(MSVC OR MINGW)

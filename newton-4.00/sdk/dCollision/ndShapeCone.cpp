@@ -25,8 +25,6 @@
 #include "ndShapeCone.h"
 #include "ndContactSolver.h"
 
-D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndShapeCone)
-
 ndInt32 ndShapeCone::m_shapeRefCount = 0;
 ndShapeConvex::ndConvexSimplexEdge ndShapeCone::m_edgeArray[D_CONE_SEGMENTS * 4];
 
@@ -36,32 +34,12 @@ ndShapeCone::ndShapeCone(ndFloat32 radius, ndFloat32 height)
 	Init(radius, height);
 }
 
-ndShapeCone::ndShapeCone(const ndLoadSaveBase::ndLoadDescriptor& desc)
-	:ndShapeConvex(m_cone)
-{
-	const nd::TiXmlNode* const xmlNode = desc.m_rootNode;
-	ndFloat32 radius = xmlGetFloat(xmlNode, "radius");
-	ndFloat32 height = xmlGetFloat(xmlNode, "height");
-	Init(radius, height);
-}
-
 ndShapeCone::~ndShapeCone()
 {
 	m_shapeRefCount--;
 	ndAssert(m_shapeRefCount >= 0);
 	ndShapeConvex::m_vertex = nullptr;
 	ndShapeConvex::m_simplex = nullptr;
-}
-
-void ndShapeCone::Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
-{
-	nd::TiXmlElement* const childNode = new nd::TiXmlElement(ClassName());
-	desc.m_rootNode->LinkEndChild(childNode);
-	childNode->SetAttribute("hashId", desc.m_nodeNodeHash);
-	ndShapeConvex::Save(ndLoadSaveBase::ndSaveDescriptor(desc, childNode));
-
-	xmlSaveParam(childNode, "radius", m_radius);
-	xmlSaveParam(childNode, "height", m_height * ndFloat32(2.0f));
 }
 
 void ndShapeCone::Init(ndFloat32 radius, ndFloat32 height)
@@ -285,7 +263,7 @@ ndInt32 ndShapeCone::CalculatePlaneIntersection(const ndVector& normal, const nd
 		const ndFloat32 inclination = ndFloat32(0.9998f);
 		if (normal.m_x < -inclination) 
 		{
-			ndMatrix matrix(normal);
+			ndMatrix matrix(ndGramSchmidtMatrix(normal));
 			matrix.m_posit.m_x = origin.m_x;
 			count = BuildCylinderCapPoly(m_radius, matrix, contactsOut);
 		}
@@ -372,3 +350,8 @@ void ndShapeCone::CalculateAabb(const ndMatrix& matrix, ndVector& p0, ndVector& 
 	ndShapeConvex::CalculateAabb(matrix, p0, p1);
 }
 
+ndUnsigned64 ndShapeCone::GetHash(ndUnsigned64 hash) const
+{
+	ndShapeInfo info(GetShapeInfo());
+	return info.GetHash(hash);
+}

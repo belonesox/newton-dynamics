@@ -30,19 +30,18 @@ class ndShapeConvexHull : public ndShapeConvex
 	class ndConvexBox;
 
 	public:
-	D_CLASS_REFLECTION(ndShapeConvexHull);
-	D_COLLISION_API ndShapeConvexHull(const ndLoadSaveBase::ndLoadDescriptor& desc);
+	D_CLASS_REFLECTION(ndShapeConvexHull,ndShapeConvex)
 	D_COLLISION_API ndShapeConvexHull(ndInt32 count, ndInt32 strideInBytes, ndFloat32 tolerance, const ndFloat32* const vertexArray, ndInt32 maxPointsOut = 0x7fffffff);
 	D_COLLISION_API virtual ~ndShapeConvexHull();
 
 	protected:
-	ndShapeInfo GetShapeInfo() const;
+	D_COLLISION_API ndShapeInfo GetShapeInfo() const;
+	D_COLLISION_API ndUnsigned64 GetHash(ndUnsigned64 hash) const;
 	ndBigVector FaceNormal(const ndEdge *face, const ndBigVector* const pool) const;
 	bool RemoveCoplanarEdge(ndPolyhedra& convex, const ndBigVector* const hullVertexArray) const;
 	bool Create(ndInt32 count, ndInt32 strideInBytes, const ndFloat32* const vertexArray, ndFloat32 tolerance, ndInt32 maxPointsOut);
 	virtual ndVector SupportVertex(const ndVector& dir, ndInt32* const vertexIndex) const;
-	D_COLLISION_API virtual void Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const;
-
+	
 	private:
 	ndVector SupportVertexBruteForce(const ndVector& dir, ndInt32* const vertexIndex) const;
 	ndVector SupportVertexhierarchical(const ndVector& dir, ndInt32* const vertexIndex) const;
@@ -60,6 +59,7 @@ class ndShapeConvexHull : public ndShapeConvex
 	ndInt32 m_faceCount;
 	ndInt32 m_soaVertexCount;
 	ndInt32 m_supportTreeCount;
+	friend class ndFileFormatShapeConvexHull;
 } D_GCC_NEWTON_ALIGN_32;
 
 #endif 

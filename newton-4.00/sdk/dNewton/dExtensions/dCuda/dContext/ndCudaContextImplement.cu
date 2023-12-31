@@ -21,112 +21,168 @@
 
 #include "ndCudaStdafx.h"
 #include "ndCudaUtils.h"
+#include "ndCudaSort.cuh"
 #include "ndCudaDevice.h"
 #include "ndCudaContext.h"
 #include "ndCudaPrefixScan.cuh"
-#include "ndCudaCountingSort.cuh"
+#include "ndCudaSortUnOrdered.cuh"
 #include "ndCudaContextImplement.h"
 #include "ndCudaContextImplementInternal.cuh"
 
-ndCudaContextImplement::ndCudaContextImplement(const ndCudaDevice* const device)
-	:m_device(device)
-	,m_sceneInfoGpu(nullptr)
-	,m_sceneInfoCpu(nullptr)
-	,m_histogram()
-	,m_bodyBuffer()
-	,m_sceneGraph()
-	,m_bodyAabbCell()
-	,m_bodyAabbCellScratch()
-	,m_transformBuffer0()
-	,m_transformBuffer1()
-	,m_transformBufferCpu()
-	,m_solverMemCpuStream(0)
-	,m_solverComputeStream(0)
-	,m_timeInSeconds(0.0f)
-	,m_frameCounter(0)
-{
-	cudaError_t cudaStatus;
-	cudaStatus = cudaStreamCreate(&m_solverMemCpuStream);
-	ndAssert(cudaStatus == cudaSuccess);
+#define	D_PROFILE_KERNELS
+#define D_USE_EVENT_FOR_SYNC
 
-	cudaStatus = cudaStreamCreate(&m_solverComputeStream);
-	ndAssert(cudaStatus == cudaSuccess);
-	
-	cudaStatus = cudaMalloc((void**)&m_sceneInfoGpu, sizeof(ndCudaSceneInfo));
-	ndAssert(cudaStatus == cudaSuccess);
-	
-	cudaStatus = cudaMallocHost((void**)&m_sceneInfoCpu, sizeof(ndCudaSceneInfo));
-	ndAssert(cudaStatus == cudaSuccess);
-	
-	if (cudaStatus != cudaSuccess)
+ndCudaContextImplement::ndCudaContextImplement(ndCudaDevice* const device)
+	:m_device(device)
+	//,m_sceneInfoGpu(nullptr)
+	//,m_sceneInfoCpu(nullptr)
+	//,m_histogram()
+	//,m_bodyBuffer()
+	//,m_sceneGraph()
+	//,m_bodyAabbCell()
+	//,m_bodyAabbCellScratch()
+	//,m_transformBuffer0()
+	//,m_transformBuffer1()
+	//,m_transformBufferCpu()
+	//,m_solverMemCpuStream(0)
+	//,m_solverComputeStream(0)
+	//,m_timeInSeconds(0.0f)
+	//,m_frameCounter(0)
+{
+	//cudaError_t cudaStatus;
+	//cudaStatus = cudaStreamCreate(&m_solverMemCpuStream);
+	//ndAssert(cudaStatus == cudaSuccess);
+	//
+	//cudaStatus = cudaStreamCreate(&m_solverComputeStream);
+	//ndAssert(cudaStatus == cudaSuccess);
+	//
+	//cudaStatus = cudaMalloc((void**)&m_sceneInfoGpu, sizeof(ndCudaSceneInfo));
+	//ndAssert(cudaStatus == cudaSuccess);
+	//
+	//cudaStatus = cudaMallocHost((void**)&m_sceneInfoCpu, sizeof(ndCudaSceneInfo));
+	//ndAssert(cudaStatus == cudaSuccess);
+	//
+	//if (cudaStatus != cudaSuccess)
+	//{
+	//	ndAssert(0);
+	//}
+	//
+	//*m_sceneInfoCpu = ndCudaSceneInfo();
+	m_sortPrefixBuffer.SetCount(m_sortPrefixBuffer.GetCapacity());
+
+	// ***********************************
+	//m_src.SetCount(8);
+	//m_src.SetCount(17);
+	//m_src.SetCount(64);
+	//m_src.SetCount(256);
+	//m_src.SetCount(256 + 99);
+	//m_src.SetCount(301);
+	//m_src.SetCount(512);
+	//m_src.SetCount(512 + 100);
+	//m_src.SetCount(512 + 99);
+	m_src.SetCount(10000);
+	//m_src.SetCount(100000);
+	//m_src.SetCount(1000000);
+	for (int i = 0; i < m_src.GetCount(); ++i)
 	{
-		ndAssert(0);
+		//m_src[i] = rand() % 256;
+		m_src[i] = rand() % (256 * 256);
+		//m_src[i] = rand() & 0x7fffffff;
+		//m_src[i] = m_src.GetCount() - i - 1;
+		//m_src[i] = m_src[i] & 0xff;
+		//m_src[i] = m_src.GetCount() - 1 - i;
 	}
 
-	*m_sceneInfoCpu = ndCudaSceneInfo();
+	//m_src[4] = 1;
+	//m_src[9] = 1;
+	//m_src[14] = 1;
+	//m_src[0] = 255;
+	//m_src[11] = 1;
+	//m_src[20] = 0;
+	//m_src[21] = 1;
+
+	m_dst1 = m_src;
+	m_dst0 = m_src;
+
+	m_buf = m_src;
+	m_buf0 = m_buf;
+	m_buf1 = m_buf;
+
+	class GetKey0
+	{
+		public:
+		int GetRadix(int item) const
+		{
+			return item & 0xff;
+		};
+	};
+
+	class GetKey1
+	{
+		public:
+		int GetRadix(int item) const
+		{
+			return (item >> 8) & 0xff;
+		};
+	};
+
+	ndCudaHostBuffer<int> scan;
+	scan.SetCount(1024 * 256);
+	ndCountingSort<int, GetKey0, 8>(m_src, m_dst0, scan);
+	ndCountingSort<int, GetKey1, 8>(m_src, m_dst0, scan);
+	//ndCountingSort<int, GetKey1, 8>(m_dst0, m_src, scan);
+	for (int i = 1; i < m_src.GetCount(); ++i)
+	{
+		int a = m_src[i - 1];
+		int b = m_src[i - 0];
+		ndAssert(a <= b);
+	}
 }
 
 ndCudaContextImplement::~ndCudaContextImplement()
 {
-	cudaError_t cudaStatus;
-	cudaStatus = cudaFreeHost(m_sceneInfoCpu);
-	ndAssert(cudaStatus == cudaSuccess);
+	ndAssert(m_device);
 	
-	cudaStatus = cudaFree(m_sceneInfoGpu);
-	ndAssert(cudaStatus == cudaSuccess);
-	
-	cudaStatus = cudaStreamDestroy(m_solverComputeStream);
-	ndAssert(cudaStatus == cudaSuccess);
-
-	cudaStatus = cudaStreamDestroy(m_solverMemCpuStream);
-	ndAssert(cudaStatus == cudaSuccess);
-	
-	if (cudaStatus != cudaSuccess)
-	{
-		ndAssert(0);
-	}
+	//cudaError_t cudaStatus;
+	//cudaStatus = cudaFreeHost(m_sceneInfoCpu);
+	//ndAssert(cudaStatus == cudaSuccess);
+	//
+	//cudaStatus = cudaFree(m_sceneInfoGpu);
+	//ndAssert(cudaStatus == cudaSuccess);
+	//
+	//cudaStatus = cudaStreamDestroy(m_solverComputeStream);
+	//ndAssert(cudaStatus == cudaSuccess);
+	//
+	//cudaStatus = cudaStreamDestroy(m_solverMemCpuStream);
+	//ndAssert(cudaStatus == cudaSuccess);
+	//
+	//if (cudaStatus != cudaSuccess)
+	//{
+	//	ndAssert(0);
+	//}
 }
 
-float ndCudaContextImplement::GetTimeInSeconds() const
+ndCudaDevice* ndCudaContextImplement::GetDevice() const
 {
-	return float (m_timeInSeconds);
+	return m_device;
 }
 
-void ndCudaContextImplement::Begin()
+const char* ndCudaContextImplement::GetStringId() const
 {
-	cudaDeviceSynchronize();
-	// get the scene info from the update	
-	ndCudaSceneInfo* const gpuInfo = m_sceneInfoGpu;
-	ndCudaSceneInfo* const cpuInfo = m_sceneInfoCpu;
-
-	cudaError_t cudaStatus = cudaMemcpyAsync(cpuInfo, gpuInfo, sizeof(ndCudaSceneInfo), cudaMemcpyDeviceToHost, m_solverMemCpuStream);
-	ndAssert(cudaStatus == cudaSuccess);
-	if (cudaStatus != cudaSuccess)
-	{
-		ndAssert(0);
-	}
-
-	m_timeInSeconds = double(cpuInfo->m_frameTimeInNanosecunds) * double (1.0e-9f);
-	//printf("cpu frame:%d ms:%lld\n", cpuInfo->m_frameCount, cpuInfo->m_frameTimeInNanosecunds/1000000);
-
-	const int frameCounter = m_frameCounter;
-	if (frameCounter)
-	{
-		ndCudaHostBuffer<ndCudaSpatialVector>& cpuBuffer = m_transformBufferCpu;
-		ndCudaDeviceBuffer<ndCudaSpatialVector>& gpuBuffer = (frameCounter & 1) ? m_transformBuffer1 : m_transformBuffer0;
-		gpuBuffer.WriteData(&cpuBuffer[0], cpuBuffer.GetCount() - 1, m_solverMemCpuStream);
-	}
-
-	ndCudaBeginFrame << < 1, 1, 0, m_solverComputeStream >> > (*gpuInfo);
+	return m_device->m_prop.name;
 }
 
-void ndCudaContextImplement::End()
+int ndCudaContextImplement::GetComputeUnits() const
 {
-	m_frameCounter = m_frameCounter + 1;
-	ndCudaSceneInfo* const gpuInfo = m_sceneInfoGpu;
-	ndCudaEndFrame << < 1, 1, 0, m_solverComputeStream >> > (*gpuInfo, m_frameCounter);
+	return m_device->GetComputeUnits();
 }
 
+ndCudaDeviceBuffer<int>& ndCudaContextImplement::GetPrefixScanBuffer()
+{
+	return m_sortPrefixBuffer;
+}
+
+#if 0
 ndCudaSpatialVector* ndCudaContextImplement::GetTransformBuffer()
 {
 	return &m_transformBufferCpu[0];
@@ -156,7 +212,7 @@ void ndCudaContextImplement::ResizeBuffers(int cpuBodyCount)
 
 void ndCudaContextImplement::LoadBodyData(const ndCudaBodyProxy* const src, int cpuBodyCount)
 {
-	cudaDeviceSynchronize();
+	m_imageCpu.m_context->m_device->SyncDevice();
 		
 	ndCudaSceneInfo info;
 	info.m_histogram = ndCudaBuffer<unsigned>(m_histogram);
@@ -176,7 +232,7 @@ void ndCudaContextImplement::LoadBodyData(const ndCudaBodyProxy* const src, int 
 	ndCudaInitTransforms << <blocksCount, D_THREADS_PER_BLOCK, 0, m_solverComputeStream >> > (*m_sceneInfoCpu);
 	ndCudaGenerateSceneGraph << <1, 1, 0, m_solverComputeStream >> > (*m_sceneInfoCpu);
 	
-	cudaDeviceSynchronize();
+	m_imageCpu.m_context->m_device->SyncDevice();
 	if (cudaStatus != cudaSuccess)
 	{
 		ndAssert(0);
@@ -188,7 +244,7 @@ void ndCudaContextImplement::ValidateContextBuffers()
 	ndCudaSceneInfo* const sceneInfo = m_sceneInfoCpu;
 	if (!sceneInfo->m_frameIsValid)
 	{
-		cudaDeviceSynchronize();
+		m_device->SyncDevice();
 
 		if (sceneInfo->m_histogram.m_size > sceneInfo->m_histogram.m_capacity)
 		{
@@ -218,7 +274,7 @@ void ndCudaContextImplement::ValidateContextBuffers()
 		{
 			ndAssert(0);
 		}
-		cudaDeviceSynchronize();
+		m_imageCpu.m_context->m_device->SyncDevice();
 	}
 }
 
@@ -342,3 +398,182 @@ void ndCudaContextImplement::InitBodyArray()
 	ndCudaCountingSort << <1, 1, 0, m_solverComputeStream >> > (*infoGpu, dommyType, GetDstBuffer, GetSrcBuffer, GetItemsCount, GetSortKey_w, 256);
 	ndCudaCalculateBodyPairsCount << <1, 1, 0, m_solverComputeStream >> > (*infoGpu);
 }
+
+#endif
+
+void ndCudaContextImplement::PrepareCleanup()
+{
+	m_device->SyncDevice();
+}
+
+void ndCudaContextImplement::Cleanup()
+{
+	m_device->SyncDevice();
+
+#ifdef	D_USE_EVENT_FOR_SYNC
+	m_device->m_lastError = cudaEventRecord(m_device->m_syncEvent, 0);
+	ndAssert(m_device->m_lastError == cudaSuccess);
+#endif
+}
+
+void ndCudaContextImplement::Begin()
+{
+#ifdef D_PROFILE_KERNELS
+	m_device->m_lastError = cudaEventRecord(m_device->m_startTimer, 0);
+	ndAssert(m_device->m_lastError == cudaSuccess);
+#endif
+
+	//// get the scene info from the update	
+	//ndCudaSceneInfo* const gpuInfo = m_sceneInfoGpu;
+	//ndCudaSceneInfo* const cpuInfo = m_sceneInfoCpu;
+	//
+	//cudaError_t cudaStatus = cudaMemcpyAsync(cpuInfo, gpuInfo, sizeof(ndCudaSceneInfo), cudaMemcpyDeviceToHost, m_solverMemCpuStream);
+	//ndAssert(cudaStatus == cudaSuccess);
+	//if (cudaStatus != cudaSuccess)
+	//{
+	//	ndAssert(0);
+	//}
+	//
+	//m_timeInSeconds = double(cpuInfo->m_frameTimeInNanosecunds) * double(1.0e-9f);
+	////printf("cpu frame:%d ms:%lld\n", cpuInfo->m_frameCount, cpuInfo->m_frameTimeInNanosecunds/1000000);
+	//
+	//const int frameCounter = m_frameCounter;
+	//if (frameCounter)
+	//{
+	//	ndCudaHostBuffer<ndCudaSpatialVector>& cpuBuffer = m_transformBufferCpu;
+	//	ndCudaDeviceBuffer<ndCudaSpatialVector>& gpuBuffer = (frameCounter & 1) ? m_transformBuffer1 : m_transformBuffer0;
+	//	gpuBuffer.WriteData(&cpuBuffer[0], cpuBuffer.GetCount() - 1, m_solverMemCpuStream);
+	//}
+	//
+	//ndCudaBeginFrame << < 1, 1, 0, m_solverComputeStream >> > (*gpuInfo);
+
+	//class GetKey
+	//{
+	//	public:
+	//	int GetRadix(int item) const
+	//	{
+	//		return item & 0xff;
+	//	};
+	//};
+	//ndCountingSort<int, GetKey, 8>(m_src, m_dst0, m_scan0);
+	//ndCountingSort<int, GetKey, 8>(m_src, m_dst0, m_scan0);
+	//ndCountingSort<int, GetKey, 8>(m_src, m_dst0, m_scan0);
+	//ndCountingSort<int, GetKey, 8>(m_src, m_dst0, m_scan0);
+
+#if 1
+
+	cudaEvent_t start_event, stop_event;
+	cudaEventCreate(&start_event);
+	cudaEventCreate(&stop_event);
+
+	int numIterations = 1;
+	//int numIterations = 100;
+	cudaEventRecord(start_event, 0);
+	for (int i = 0; i < numIterations; ++i)
+	{
+#if 0
+		auto GetRadix = []  __host__ __device__(int item)
+		{
+			//return item & (1024 - 1);
+			return item & (256 - 1);
+		};
+
+		ndCountingSortUnOrdered<int, 8>(this, m_buf0, m_buf1, GetRadix);
+		//ndCountingSortUnOrdered<int, 8>(this, m_buf0, m_buf1, GetRadix);
+		//ndCountingSortUnOrdered<int, 8>(this, m_buf0, m_buf1, GetRadix);
+		//ndCountingSortUnOrdered<int, 8>(this, m_buf0, m_buf1, GetRadix);
+#else
+		auto GetRadix0 = []  __host__ __device__(int item)
+		{
+			return item & 0xff;
+		};
+
+		auto GetRadix1 = []  __host__ __device__(int item)
+		{
+			return (item >> 8) & 0xff;
+		};
+		
+		//auto GetRadix2 = []  __host__ __device__(int item)
+		//{
+		//	return (item >> 16) & 0xff;
+		//};
+		//
+		//auto GetRadix3 = []  __host__ __device__(int item)
+		//{
+		//	return (item >> 24) & 0xff;
+		//};
+
+		//m_dst0 = m_buf1;
+		//ndCountingSort<int, 8>(this, m_buf0, m_buf1, GetRadix0);
+		//ndCountingSort<int, 8>(this, m_buf0, m_buf1, GetRadix0);
+		//ndCountingSort<int, 8>(this, m_buf0, m_buf1, GetRadix0);
+		//ndCountingSort<int, 8>(this, m_buf0, m_buf1, GetRadix0);
+		 
+		ndCountingSort<int, 8>(this, m_buf0, m_buf1, GetRadix0);
+		ndCountingSort<int, 8>(this, m_buf0, m_buf1, GetRadix1);
+		//ndCountingSort<int, 8>(this, m_buf0, m_buf1, GetRadix2);
+		//ndCountingSort<int, 8>(this, m_buf1, m_buf1, GetRadix3);
+#endif
+	}
+	cudaEventRecord(stop_event, 0);
+	cudaEventSynchronize(stop_event);
+
+	float totalTime;
+	cudaEventElapsedTime(&totalTime, start_event, stop_event);
+
+	//totalTime = totalTime * 1.0e-3f;
+	float gigKeys = float (m_buf0.GetCount() * numIterations) * (1.0e-9f * 1.0e3f);
+	cudaExpandTraceMessage("newton sort, throughput = %f gigaKeys/seconds, time = %f ms, size = %u elements\n", gigKeys / totalTime, totalTime/numIterations, m_buf0.GetCount());
+
+#if 1
+	m_device->SyncDevice();
+	//m_buf1.WriteData(&m_dst0[0], m_dst0.GetCount());
+	//m_buf0.WriteData(&m_dst0[0], m_dst0.GetCount());
+
+	m_dst0 = m_buf0;
+	m_dst1 = m_buf1;
+	for (int i = 1; i < m_dst0.GetCount(); ++i)
+	{
+		int a = m_dst0[i - 1];
+		int b = m_dst0[i - 0];
+		ndAssert(a <= b);
+	}
+	m_buf0.WriteData(&m_dst1[0], m_dst1.GetCount());
+	#endif
+#endif
+}
+
+void ndCudaContextImplement::End()
+{
+#ifdef D_PROFILE_KERNELS
+	cudaEventRecord(m_device->m_stopTimer, 0);
+#endif
+
+#ifdef	D_USE_EVENT_FOR_SYNC
+	m_device->m_lastError = cudaEventRecord(m_device->m_syncEvent, 0);
+	ndAssert(m_device->m_lastError == cudaSuccess);
+	cudaEventSynchronize(m_device->m_syncEvent);
+#else
+	m_device->SyncDevice();
+#endif
+
+#ifdef D_PROFILE_KERNELS
+	float elapsedTime;
+	cudaEventElapsedTime(&elapsedTime, m_device->m_startTimer, m_device->m_stopTimer);
+
+	m_device->m_timerFrames++;
+	m_device->m_timeAcc += elapsedTime;
+	if (m_device->m_timerFrames >= 60)
+	{
+		cuTrace (("kernels average time = %f ms\n", m_device->m_timeAcc / m_device->m_timerFrames));
+		m_device->m_timerFrames = 0;
+		m_device->m_timeAcc = 0.0f;
+	}
+#endif
+
+	//m_frameCounter = m_frameCounter + 1;
+	//ndCudaSceneInfo* const gpuInfo = m_sceneInfoGpu;
+	//ndCudaEndFrame << < 1, 1, 0, m_solverComputeStream >> > (*gpuInfo, m_frameCounter);
+}
+
+

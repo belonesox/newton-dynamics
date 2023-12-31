@@ -19,6 +19,9 @@
 * 3. This notice may not be removed or altered from any source distribution.
 */
 
+#ifndef __ND_WORLD_SCENE_H__
+#define __ND_WORLD_SCENE_H__
+
 #include "ndNewtonStdafx.h"
 #include "ndWorld.h"
 
@@ -41,3 +44,5 @@ inline ndWorld* ndWorldScene::GetWorld() const
 {
 	return m_world;
 }
+
+#endif

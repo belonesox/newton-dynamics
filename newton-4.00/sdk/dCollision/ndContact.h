@@ -99,24 +99,22 @@ class ndContact: public ndConstraint
 	D_COLLISION_API ndContact();
 	D_COLLISION_API virtual ~ndContact();
 
-	D_COLLISION_API virtual ndBodyKinematic* GetBody0() const;
-	D_COLLISION_API virtual ndBodyKinematic* GetBody1() const;
-
 	D_COLLISION_API void AttachToBodies();
 	D_COLLISION_API void DetachFromBodies();
-
-	ndContact* GetAsContact();
-	virtual ndUnsigned32 GetRowsCount() const;
-
+	
 	const ndMaterial* GetMaterial() const;
+
+	virtual ndContact* GetAsContact();
 	virtual void JacobianDerivative(ndConstraintDescritor& desc);
 	virtual void JointAccelerations(ndJointAccelerationDecriptor* const desc);
 	
 	ndContactPointList& GetContactPoints();
 	const ndContactPointList& GetContactPoints() const;
 
+	bool IsTestOnly() const;
+	bool IsInTrigger() const;
 	bool IsSkeletonSelftCollision() const;
-	bool IsSkeletonIntraCollision() const;
+	//bool IsSkeletonIntraCollision() const;
 	
 	private:
 	void SetBodies(ndBodyKinematic* const body0, ndBodyKinematic* const body1);
@@ -127,17 +125,16 @@ class ndContact: public ndConstraint
 	ndQuaternion m_rotationAcc;
 	ndVector m_separatingVector;
 	ndContactPointList m_contacPointsList;
-	ndBodyKinematic* m_body0;
-	ndBodyKinematic* m_body1;
 	ndMaterial* m_material;
 	ndFloat32 m_timeOfImpact;
 	ndFloat32 m_separationDistance;
-	ndUnsigned32 m_maxDOF;
+	//ndUnsigned32 m_maxDOF;
 	ndUnsigned32 m_sceneLru;
 	ndUnsigned32 m_isDead : 1;
+	ndUnsigned32 m_inTrigger : 1;
 	ndUnsigned32 m_isAttached : 1;
 	ndUnsigned32 m_isIntersetionTestOnly : 1;
-	ndUnsigned32 m_skeletonIntraCollision : 1;
+	//ndUnsigned32 m_skeletonIntraCollision : 1;
 	ndUnsigned32 m_skeletonSelftCollision : 1;
 	static ndVector m_initialSeparatingVector;
 
@@ -161,20 +158,10 @@ inline const ndMaterial* ndContact::GetMaterial() const
 	return m_material;
 }
 
-inline ndUnsigned32 ndContact::GetRowsCount() const
-{
-	return m_maxDOF;
-}
-
-inline ndBodyKinematic* ndContact::GetBody0() const
-{
-	return m_body0;
-}
-
-inline ndBodyKinematic* ndContact::GetBody1() const
-{
-	return m_body1;
-}
+//inline ndUnsigned32 ndContact::GetRowsCount() const
+//{
+//	return m_maxDOF;
+//}
 
 inline ndContactPointList& ndContact::GetContactPoints()
 {
@@ -186,20 +173,25 @@ inline const ndContactPointList& ndContact::GetContactPoints() const
 	return m_contacPointsList;
 }
 
-//inline bool ndContact::IsActive() const
-//{
-//	return m_active ? true : false;
-//}
-
 inline bool ndContact::IsSkeletonSelftCollision() const
 {
-	return m_skeletonSelftCollision ? true : false;;
+	return m_skeletonSelftCollision ? true : false;
 }
 
-inline bool ndContact::IsSkeletonIntraCollision() const
+inline bool ndContact::IsInTrigger() const
 {
-	return m_skeletonIntraCollision ? true : false;
+	return m_inTrigger;
 }
+
+inline bool ndContact::IsTestOnly() const
+{
+	return m_isIntersetionTestOnly ? true : false;
+}
+
+//inline bool ndContact::IsSkeletonIntraCollision() const
+//{
+//	return m_skeletonIntraCollision ? true : false;
+//}
 
 
 #endif 

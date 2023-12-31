@@ -27,10 +27,54 @@
 #include "ndConstraint.h"
 #include "ndBodyKinematic.h"
 
+void ndForceImpactPair::Clear()
+{
+	m_force = ndFloat32(ndFloat32(0.0f));
+	m_impact = ndFloat32(ndFloat32(0.0f));
+	for (ndInt32 i = 0; i < ndInt32(sizeof(m_initialGuess) / sizeof(m_initialGuess[0])); ++i)
+	{
+		m_initialGuess[i] = ndFloat32(ndFloat32(0.0f));
+	}
+}
+
+void ndForceImpactPair::Push(ndFloat32 val)
+{
+	for (ndInt32 i = 1; i < ndInt32(sizeof(m_initialGuess) / sizeof(m_initialGuess[0])); ++i)
+	{
+		m_initialGuess[i - 1] = m_initialGuess[i];
+	}
+	m_initialGuess[sizeof(m_initialGuess) / sizeof(m_initialGuess[0]) - 1] = val;
+}
+
+ndFloat32 ndForceImpactPair::GetInitialGuess() const
+{
+	//return 100.0f;
+	ndFloat32 smallest = ndFloat32(1.0e15f);
+	ndFloat32 value = ndFloat32(ndFloat32(0.0f));
+	for (ndInt32 i = 0; i < ndInt32(sizeof(m_initialGuess) / sizeof(m_initialGuess[0])); ++i)
+	{
+		ndFloat32 mag = ndAbs(m_initialGuess[i]);
+		if (mag < smallest)
+		{
+			smallest = mag;
+			value = m_initialGuess[i];
+		}
+	}
+	return value;
+}
+
+
 ndConstraint::ndConstraint()
 	:ndContainersFreeListAlloc<ndConstraint>()
+	,m_forceBody0(ndVector::m_zero)
+	,m_torqueBody0(ndVector::m_zero)
+	,m_forceBody1(ndVector::m_zero)
+	,m_torqueBody1(ndVector::m_zero)
+	,m_body0(nullptr)
+	,m_body1(nullptr)
 	,m_rowCount(0)
 	,m_rowStart(0)
+	,m_maxDof(0)
 	,m_active(1)
 	,m_fence0(0)
 	,m_fence1(0)

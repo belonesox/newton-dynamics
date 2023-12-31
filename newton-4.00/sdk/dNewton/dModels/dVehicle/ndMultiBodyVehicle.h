@@ -62,9 +62,6 @@ class ndMultiBodyVehicle: public ndModel
 		ndDownForce();
 		ndFloat32 GetDownforceFactor(ndFloat32 speed) const;
 
-		void Load(const nd::TiXmlNode* const xmlNode);
-		void Save(nd::TiXmlNode* const xmlNode) const;
-
 		private:
 		ndFloat32 CalculateFactor(const ndSpeedForcePair* const entry) const;
 	
@@ -75,10 +72,12 @@ class ndMultiBodyVehicle: public ndModel
 		friend class ndMultiBodyVehicleTireJoint;
 	};
 
-	D_CLASS_REFLECTION(ndMultiBodyVehicle);
-	D_NEWTON_API ndMultiBodyVehicle(const ndLoadSaveBase::ndLoadDescriptor& desc);
+	D_CLASS_REFLECTION(ndMultiBodyVehicle, ndModel)
 	D_NEWTON_API ndMultiBodyVehicle(const ndVector& frontDir, const ndVector& upDir);
 	D_NEWTON_API virtual ~ndMultiBodyVehicle ();
+
+	virtual void OnAddToWorld() { ndAssert(0); }
+	virtual void OnRemoveFromToWorld() { ndAssert(0); }
 
 	D_NEWTON_API ndFloat32 GetSpeed() const;
 	D_NEWTON_API ndShapeInstance CreateTireShape(ndFloat32 radius, ndFloat32 width) const;
@@ -113,24 +112,24 @@ class ndMultiBodyVehicle: public ndModel
 	protected:
 	bool isActive() const;
 	virtual void ApplyInputs(ndWorld* const world, ndFloat32 timestep);
-	D_NEWTON_API virtual void RemoveFromToWorld();
-	D_NEWTON_API virtual void AddToWorld(ndWorld* const world);
+	//D_NEWTON_API virtual void RemoveFromToWorld();
+	//D_NEWTON_API virtual void AddToWorld(ndWorld* const world);
+
 	D_NEWTON_API virtual void Debug(ndConstraintDebugCallback& context) const;
 	D_NEWTON_API virtual void Update(ndWorld* const world, ndFloat32 timestep);
 	D_NEWTON_API virtual void PostUpdate(ndWorld* const world, ndFloat32 timestep);
-	D_NEWTON_API virtual void Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const;
 
 	ndMatrix m_localFrame;
 	ndBodyKinematic* m_chassis;
 	ndIkSolver m_invDynamicsSolver;
 	ndShapeChamferCylinder* m_tireShape;
-	ndReferencedObjects<ndBody> m_internalBodies;
-	ndSharedPtr<ndMultiBodyVehicleMotor> m_motor;
-	ndSharedPtr<ndMultiBodyVehicleGearBox> m_gearBox;
-	ndSharedPtr<ndMultiBodyVehicleTorsionBar> m_torsionBar;
-	ndReferencedObjects<ndMultiBodyVehicleTireJoint> m_tireList;
-	ndReferencedObjects<ndMultiBodyVehicleDifferentialAxle> m_axleList;
-	ndReferencedObjects<ndMultiBodyVehicleDifferential> m_differentialList;
+	//ndReferencedObjects<ndBody> m_internalBodies;
+	//ndSharedPtr<ndMultiBodyVehicleMotor> m_motor;
+	//ndSharedPtr<ndMultiBodyVehicleGearBox> m_gearBox;
+	//ndSharedPtr<ndMultiBodyVehicleTorsionBar> m_torsionBar;
+	//ndReferencedObjects<ndMultiBodyVehicleTireJoint> m_tireList;
+	//ndReferencedObjects<ndMultiBodyVehicleDifferentialAxle> m_axleList;
+	//ndReferencedObjects<ndMultiBodyVehicleDifferential> m_differentialList;
 	ndDownForce m_downForce;
 	
 	friend class ndMultiBodyVehicleMotor;

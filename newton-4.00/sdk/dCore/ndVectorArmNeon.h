@@ -84,6 +84,23 @@ class ndVector
 		,m_w(ndFloat32(ptr[3]))
 	{
 	}
+
+	inline ndVector(ndFloat64 x, ndFloat64 y, ndFloat64 z, ndFloat64 w)
+		:m_x(ndFloat32(x))
+		,m_y(ndFloat32(y))
+		,m_z(ndFloat32(z))
+		,m_w(ndFloat32(w))
+	{
+	}
+
+	inline ndVector(const ndBigVector& copy)
+		:m_x(ndFloat32(((ndFloat64*)&copy)[0]))
+		,m_y(ndFloat32(((ndFloat64*)&copy)[1]))
+		,m_z(ndFloat32(((ndFloat64*)&copy)[2]))
+		,m_w(ndFloat32(((ndFloat64*)&copy)[3]))
+	{
+		ndAssert(ndCheckVector((*this)));
+	}
 #endif
 
 	inline ndVector(ndFloat32 x, ndFloat32 y, ndFloat32 z, ndFloat32 w)
@@ -97,16 +114,45 @@ class ndVector
 	{
 	}
 
-#ifndef  D_NEWTON_USE_DOUBLE 
-	inline ndVector(const ndBigVector& copy)
-		:m_x(ndFloat32(((ndFloat64*)&copy)[0]))
-		,m_y(ndFloat32(((ndFloat64*)&copy)[1]))
-		,m_z(ndFloat32(((ndFloat64*)&copy)[2]))
-		,m_w(ndFloat32(((ndFloat64*)&copy)[3]))
+	inline ndFloat32 GetX() const
 	{
-		ndAssert(ndCheckVector((*this)));
+		return m_x;
 	}
-#endif
+
+	inline ndFloat32 GetY() const
+	{
+		return m_y;
+	}
+
+	inline ndFloat32 GetZ() const
+	{
+		return m_z;
+	}
+
+	inline ndFloat32 GetW() const
+	{
+		return m_w;
+	}
+
+	inline void SetX(ndFloat32 x)
+	{
+		m_x = x;
+	}
+
+	inline void SetY(ndFloat32 x)
+	{
+		m_y = x;
+	}
+
+	inline void SetZ(ndFloat32 x)
+	{
+		m_z = x;
+	}
+
+	inline void SetW(ndFloat32 x)
+	{
+		m_w = x;
+	}
 
 	inline ndFloat32 GetScalar() const
 	{
@@ -281,6 +327,11 @@ class ndVector
 		return (*this * A).AddHorizontal();
 	}
 
+	inline ndVector Divide(const ndVector& denominator) const
+	{
+		return ndVector(m_x / denominator.m_x, m_y / denominator.m_y, m_z / denominator.m_z, m_w / denominator.m_w);
+	}
+
 	inline ndVector Reciproc() const
 	{
 		return ndVector(ndFloat32(1.0f) / m_x, ndFloat32(1.0f) / m_y, ndFloat32(1.0f) / m_z, ndFloat32(1.0f) / m_w);
@@ -406,6 +457,16 @@ class ndVector
 		return ndVector(ndInt32(ndUnsigned32(m_ix) >> bits), ndInt32(ndUnsigned32(m_iy) >> bits), ndInt32(ndUnsigned32(m_iz) >> bits), ndInt32(ndUnsigned32(m_iw) >> bits));
 	}
 
+	inline ndVector OptimizedVectorUnrotate(const ndVector& front, const ndVector& up, const ndVector& right) const
+	{
+		// for now since I can't test arm on PC
+		return ndVector(
+			m_x * front.m_x + m_y * front.m_y + m_z * front.m_z,
+			m_x * up.m_x + m_y * up.m_y + m_z * up.m_z,
+			m_x * right.m_x + m_y * right.m_y + m_z * right.m_z,
+			ndFloat32(0.0f));
+	}
+
 	inline static void Transpose4x4(ndVector& dst0, ndVector& dst1, ndVector& dst2, ndVector& dst3, const ndVector& src0, const ndVector& src1, const ndVector& src2, const ndVector& src3)
 	{
 		float32x4x2_t vtrn1 = vzipq_f32(src0.m_type, src2.m_type);
@@ -511,6 +572,46 @@ class ndBigVector
 	inline ndBigVector(ndInt64 ix, ndInt64 iy, ndInt64 iz, ndInt64 iw)
 		: m_ix(ix), m_iy(iy), m_iz(iz), m_iw(iw)
 	{
+	}
+
+	inline ndFloat64 GetX() const
+	{
+		return m_x;
+	}
+
+	inline ndFloat64 GetY() const
+	{
+		return m_y;
+	}
+
+	inline ndFloat64 GetZ() const
+	{
+		return m_z;
+	}
+
+	inline ndFloat64 GetW() const
+	{
+		return m_w;
+	}
+
+	inline void SetX(ndFloat64 x)
+	{
+		m_x = x;
+	}
+
+	inline void SetY(ndFloat64 x)
+	{
+		m_y = x;
+	}
+
+	inline void SetZ(ndFloat64 x)
+	{
+		m_z = x;
+	}
+
+	inline void SetW(ndFloat64 x)
+	{
+		m_w = x;
 	}
 
 	inline ndFloat64 GetScalar() const
@@ -684,6 +785,11 @@ class ndBigVector
 		return (*this * A).AddHorizontal();
 	}
 
+	inline ndBigVector Divide(const ndBigVector& denominator) const
+	{
+		return ndVector(m_x / denominator.m_x, m_y / denominator.m_y, m_z / denominator.m_z, m_w / denominator.m_w);
+	}
+
 	inline ndBigVector Reciproc() const
 	{
 		return ndBigVector(ndFloat64(1.0f) / m_x, ndFloat64(1.0f) / m_y, ndFloat64(1.0f) / m_z, ndFloat64(1.0f) / m_w);
@@ -846,6 +952,15 @@ class ndBigVector
 	inline ndBigVector ShiftRightLogical(ndInt32 bits) const
 	{
 		return ndBigVector(ndInt64(ndUnsigned64(m_ix) >> bits), ndInt64(ndUnsigned64(m_iy) >> bits), ndInt64(ndUnsigned64(m_iz) >> bits), ndInt64(ndUnsigned64(m_iw) >> bits));
+	}
+
+	inline ndBigVector OptimizedVectorUnrotate(const ndBigVector& front, const ndBigVector& up, const ndBigVector& right) const
+	{
+		return ndBigVector(
+			m_x * front.m_x + m_y * front.m_y + m_z * front.m_z,
+			m_x * up.m_x + m_y * up.m_y + m_z * up.m_z,
+			m_x * right.m_x + m_y * right.m_y + m_z * right.m_z,
+			ndFloat64(0.0f));
 	}
 
 	inline static void Transpose4x4(ndBigVector& dst0, ndBigVector& dst1, ndBigVector& dst2, ndBigVector& dst3, const ndBigVector& src0, const ndBigVector& src1, const ndBigVector& src2, const ndBigVector& src3)

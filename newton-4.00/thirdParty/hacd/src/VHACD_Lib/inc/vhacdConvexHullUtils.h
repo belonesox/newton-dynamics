@@ -22,11 +22,7 @@
 #ifndef __ND_CONVEXHULL_3D_UTILS__
 #define __ND_CONVEXHULL_3D_UTILS__
 
-
-#include <vector>
-#include <atomic>
-#include <thread>
-#include <condition_variable>
+#include "vhacdDefines.h"
 #include "vhacdVector.h"
 
 #ifndef _ASSERT
@@ -370,7 +366,7 @@ namespace nd_
 		};
 
 		template <class dItem, class dKey>
-		class ndDownHeap : public ndHeap<dItem, ndDownHeapCompare<dKey>>
+		class ndDownHeap : public ndHeap<dItem, ndDownHeapCompare<dKey> >
 		{
 			public:
 			ndDownHeap(int maxElements)
@@ -423,7 +419,7 @@ namespace nd_
 		};
 
 		template <class dItem, class dKey>
-		class ndUpHeap : public ndHeap<dItem, ndUpHeapCompare<dKey>>
+		class ndUpHeap : public ndHeap<dItem, ndUpHeapCompare<dKey> >
 		{
 			public:
 			ndUpHeap(int maxElements)
@@ -746,11 +742,26 @@ namespace nd_
 				Z() = rhs.Z();
 				return *this;
 			}
+
+			inline hullVector& operator= (const hullVector& rhs)
+			{
+				X() = rhs.X();
+				Y() = rhs.Y();
+				Z() = rhs.Z();
+				return *this;
+			}
+
 		};
 
 		class hullPlane : public hullVector
 		{
 			public:
+			hullPlane(const hullPlane& src)
+				:hullVector(src)
+				,m_w(src.m_w)
+			{
+			}
+
 			hullPlane(double x, double y, double z, double w)
 				:hullVector(x, y, z, 0.0)
 				, m_w(w)
@@ -949,6 +960,10 @@ namespace nd_
 		{
 			public:
 			Job()
+			{
+			}
+
+			Job(const Job&)
 			{
 			}
 

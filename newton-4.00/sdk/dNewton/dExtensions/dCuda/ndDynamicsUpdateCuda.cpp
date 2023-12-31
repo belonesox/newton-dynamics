@@ -29,7 +29,6 @@
 #include "ndSkeletonList.h"
 #include "ndDynamicsUpdate.h"
 #include "ndWorldSceneCuda.h"
-#include "ndBodyParticleSet.h"
 #include "ndDynamicsUpdateCuda.h"
 #include "ndJointBilateralConstraint.h"
 
@@ -38,6 +37,7 @@
 //#include "cuMatrix3x3.h"
 //#include "cuSolverTypes.h"
 //#include "ndCudaContext.h"
+
 
 
 #if 0
@@ -53,21 +53,8 @@ __global__ void CudaIntegrateBodies(Predicate IntegrateVelocity, cuSceneInfo& in
 }
 #endif
 
-ndDynamicsUpdateCuda::ndDynamicsUpdateCuda(ndWorld* const world)
-	:ndDynamicsUpdate(world)
-	,m_context(((ndWorldSceneCuda*)world->GetScene())->GetContext())
-{
-}
 
-ndDynamicsUpdateCuda::~ndDynamicsUpdateCuda()
-{
-}
-
-const char* ndDynamicsUpdateCuda::GetStringId() const
-{
-	ndAssert(m_context);
-	return m_context->GetStringId();
-}
+#if 0
 
 //void ndDynamicsUpdateCuda::Clear()
 //{
@@ -645,7 +632,8 @@ void ndDynamicsUpdateCuda::InitWeights()
 		}
 
 		const ndInt32 conectivity = 7;
-		m_solverPasses = m_world->GetSolverIterations() + 2 * extraPasses / conectivity + 2;
+		//m_solverPasses = m_world->GetSolverIterations() + 2 * extraPasses / conectivity + 2;
+		m_solverPasses = ndUnsigned32(m_world->GetSolverIterations() + 2 * extraPasses / conectivity + 2);
 	}
 }
 
@@ -685,7 +673,7 @@ void ndDynamicsUpdateCuda::GetJacobianDerivatives(ndConstraint* const joint)
 {
 	ndConstraintDescritor constraintParam;
 	ndAssert(joint->GetRowsCount() <= D_CONSTRAINT_MAX_ROWS);
-	for (ndInt32 i = joint->GetRowsCount() - 1; i >= 0; i--)
+	for (ndInt32 i = ndInt32(joint->GetRowsCount() - 1); i >= 0; i--)
 	{
 		constraintParam.m_forceBounds[i].m_low = D_MIN_BOUND;
 		constraintParam.m_forceBounds[i].m_upper = D_MAX_BOUND;
@@ -714,7 +702,8 @@ void ndDynamicsUpdateCuda::GetJacobianDerivatives(ndConstraint* const joint)
 				skeleton0->AddCloseLoopJoint(contactJoint);
 			}
 		}
-		else if (contactJoint->IsSkeletonIntraCollision())
+		//else if (contactJoint->IsSkeletonIntraCollision())
+		else
 		{
 			if (skeleton0 && !skeleton1)
 			{
@@ -1020,8 +1009,9 @@ void ndDynamicsUpdateCuda::IntegrateBodiesVelocity()
 			ndBodyKinematic* const body = bodyArray[i];
 
 			ndAssert(body);
-			ndAssert(body->GetAsBodyDynamic());
 			ndAssert(body->m_isConstrained);
+			// no necessary anymore because the virtual function handle it.
+			//ndAssert(body->GetAsBodyDynamic());
 			const ndInt32 index = body->m_index;
 			const ndJacobian& forceAndTorque = internalForces[index];
 			const ndVector force(body->GetForce() + forceAndTorque.m_linear);
@@ -1040,7 +1030,7 @@ void ndDynamicsUpdateCuda::IntegrateBodiesVelocity()
 				const ndVector omegaStep2(velocStep.m_angular.DotProduct(velocStep.m_angular));
 				const ndVector test(((velocStep2 > speedFreeze2) | (omegaStep2 > speedFreeze2)) & ndVector::m_negOne);
 				const ndInt8 equilibrium = test.GetSignMask() ? 0 : 1;
-				body->m_equilibrium0 = equilibrium;
+				body->m_equilibrium0 = ndUnsigned8(equilibrium);
 			}
 			ndAssert(body->m_veloc.m_w == ndFloat32(0.0f));
 			ndAssert(body->m_omega.m_w == ndFloat32(0.0f));
@@ -1191,10 +1181,10 @@ void ndDynamicsUpdateCuda::DetermineSleepStates()
 						ndConstraint* const joint = jointArray[scan.m_joint >> 1];
 						ndBodyKinematic* const body1 = (joint->GetBody0() == body) ? joint->GetBody1() : joint->GetBody0();
 						ndAssert(body1 != body);
-						equilibrium = equilibrium & body1->m_isJointFence0;
+						equilibrium = ndUnsigned8(equilibrium & body1->m_isJointFence0);
 					}
 				}
-				body->m_equilibrium = equilibrium & body->m_autoSleep;
+				body->m_equilibrium = ndUnsigned8(equilibrium & body->m_autoSleep);
 				if (body->m_equilibrium)
 				{
 					body->m_veloc = zero;
@@ -1263,7 +1253,7 @@ void ndDynamicsUpdateCuda::UpdateSkeletons()
 void ndDynamicsUpdateCuda::CalculateJointsForce()
 {
 	D_TRACKTIME();
-	const ndInt32 passes = m_solverPasses;
+	const ndUnsigned32 passes = m_solverPasses;
 	ndScene* const scene = m_world->GetScene();
 
 	ndArray<ndBodyKinematic*>& bodyArray = scene->GetActiveBodyArray();
@@ -1277,10 +1267,8 @@ void ndDynamicsUpdateCuda::CalculateJointsForce()
 
 		auto JointForce = [this, &jointPartialForces](ndConstraint* const joint, ndInt32 jointIndex)
 		{
-			#ifdef D_USE_EARLY_OUT_JOINT
 			const ndVector zero(ndVector::m_zero);
 			ndVector accNorm(zero);
-			#endif
 			ndBodyKinematic* const body0 = joint->GetBody0();
 			ndBodyKinematic* const body1 = joint->GetBody1();
 			ndAssert(body0);
@@ -1334,10 +1322,8 @@ void ndDynamicsUpdateCuda::CalculateJointsForce()
 					const ndVector lowerFrictionForce(frictionNormal * rhs->m_lowerBoundFrictionCoefficent);
 					const ndVector upperFrictionForce(frictionNormal * rhs->m_upperBoundFrictionCoefficent);
 
-					#ifdef D_USE_EARLY_OUT_JOINT
 					a = a & (f < upperFrictionForce) & (f > lowerFrictionForce);
 					accNorm = accNorm.MulAdd(a, a);
-					#endif
 
 					f = f.GetMax(lowerFrictionForce).GetMin(upperFrictionForce);
 					rhs->m_force = f.GetScalar();
@@ -1355,17 +1341,10 @@ void ndDynamicsUpdateCuda::CalculateJointsForce()
 				const ndFloat32 tol = ndFloat32(0.125f);
 				const ndFloat32 tol2 = tol * tol;
 
-				#ifdef D_USE_EARLY_OUT_JOINT
 				ndVector maxAccel(accNorm);
 				for (ndInt32 k = 0; (k < 4) && (maxAccel.GetScalar() > tol2); k++)
-				#else
-				for (ndInt32 k = 0; k < 4; ++k)
-				#endif
 				{
-					#ifdef D_USE_EARLY_OUT_JOINT
 					maxAccel = zero;
-					#endif
-
 					for (ndInt32 j = 0; j < rowsCount; ++j)
 					{
 						ndRightHandSide* const rhs = &m_rightHandSide[rowStart + j];
@@ -1386,10 +1365,8 @@ void ndDynamicsUpdateCuda::CalculateJointsForce()
 						const ndVector lowerFrictionForce(frictionNormal * rhs->m_lowerBoundFrictionCoefficent);
 						const ndVector upperFrictionForce(frictionNormal * rhs->m_upperBoundFrictionCoefficent);
 
-						#ifdef D_USE_EARLY_OUT_JOINT
 						a = a & (f < upperFrictionForce) & (f > lowerFrictionForce);
 						maxAccel = maxAccel.MulAdd(a, a);
-						#endif
 
 						f = f.GetMax(lowerFrictionForce).GetMin(upperFrictionForce);
 						rhs->m_force = f.GetScalar();
@@ -1473,7 +1450,7 @@ void ndDynamicsUpdateCuda::CalculateJointsForce()
 		}
 	});
 
-	for (ndInt32 i = 0; i < passes; ++i)
+	for (ndInt32 i = 0; i < ndInt32(passes); ++i)
 	{
 		scene->ParallelExecute(CalculateJointsForce);
 		scene->ParallelExecute(ApplyJacobianAccumulatePartialForces);
@@ -1524,4 +1501,27 @@ void ndDynamicsUpdateCuda::DeviceUpdate()
 	//CalculateForces();
 	IntegrateBodies();
 	//DetermineSleepStates();
+}
+
+#endif
+
+ndDynamicsUpdateCuda::ndDynamicsUpdateCuda(ndWorld* const world)
+	:ndDynamicsUpdate(world)
+{
+	ndWorldSceneCuda* const scene = (ndWorldSceneCuda*)world->GetScene();
+	m_context = scene->m_context;
+}
+
+ndDynamicsUpdateCuda::~ndDynamicsUpdateCuda()
+{
+}
+
+const char* ndDynamicsUpdateCuda::GetStringId() const
+{
+	ndAssert(m_context);
+	return m_context->GetStringId();
+}
+
+void ndDynamicsUpdateCuda::Update()
+{
 }

@@ -25,8 +25,6 @@
 #include "ndShapeCylinder.h"
 #include "ndContactSolver.h"
 
-D_CLASS_REFLECTION_IMPLEMENT_LOADER(ndShapeCylinder)
-
 ndInt32 ndShapeCylinder::m_shapeRefCount = 0;
 ndShapeConvex::ndConvexSimplexEdge ndShapeCylinder::m_edgeArray[D_TAPED_CYLINDER_SEGMENTS * 2 * 3];
 
@@ -36,34 +34,12 @@ ndShapeCylinder::ndShapeCylinder(ndFloat32 radius0, ndFloat32 radius1, ndFloat32
 	Init(radius0, radius1, height);
 }
 
-ndShapeCylinder::ndShapeCylinder(const ndLoadSaveBase::ndLoadDescriptor& desc)
-	:ndShapeConvex(m_cylinder)
-{
-	const nd::TiXmlNode* const xmlNode = desc.m_rootNode;
-	ndFloat32 radius0 = xmlGetFloat(xmlNode, "radius0");
-	ndFloat32 radius1 = xmlGetFloat(xmlNode, "radius1");
-	ndFloat32 height = xmlGetFloat(xmlNode, "height");
-	Init(radius0, radius1, height);
-}
-
 ndShapeCylinder::~ndShapeCylinder()
 {
 	m_shapeRefCount--;
 	ndAssert(m_shapeRefCount >= 0);
 	ndShapeConvex::m_vertex = nullptr;
 	ndShapeConvex::m_simplex = nullptr;
-}
-
-void ndShapeCylinder::Save(const ndLoadSaveBase::ndSaveDescriptor& desc) const
-{
-	nd::TiXmlElement* const childNode = new nd::TiXmlElement(ClassName());
-	desc.m_rootNode->LinkEndChild(childNode);
-	childNode->SetAttribute("hashId", desc.m_nodeNodeHash);
-	ndShapeConvex::Save(ndLoadSaveBase::ndSaveDescriptor(desc, childNode));
-
-	xmlSaveParam(childNode, "radius0", m_radius0);
-	xmlSaveParam(childNode, "radius1", m_radius1);
-	xmlSaveParam(childNode, "height", m_height * ndFloat32(2.0f));
 }
 
 void ndShapeCylinder::Init(ndFloat32 radio0, ndFloat32 radio1, ndFloat32 height)
@@ -306,7 +282,7 @@ ndInt32 ndShapeCylinder::CalculatePlaneIntersection(const ndVector& normal, cons
 	{
 		if (normal.m_x < -inclination) 
 		{
-			ndMatrix matrix(normal);
+			ndMatrix matrix(ndGramSchmidtMatrix (normal));
 			matrix.m_posit.m_x = origin.m_x;
 			count = BuildCylinderCapPoly(m_radius0, matrix, contactsOut);
 			//count = RectifyConvexSlice(n, normal, contactsOut);
@@ -354,7 +330,7 @@ ndInt32 ndShapeCylinder::CalculatePlaneIntersection(const ndVector& normal, cons
 	{
 		if (normal.m_x > inclination) 
 		{
-			ndMatrix matrix(normal);
+			ndMatrix matrix(ndGramSchmidtMatrix(normal));
 			matrix.m_posit.m_x = origin.m_x;
 			count = BuildCylinderCapPoly(m_radius1, matrix, contactsOut);
 			//count = RectifyConvexSlice(n, normal, contactsOut);
@@ -441,3 +417,8 @@ void ndShapeCylinder::CalculateAabb(const ndMatrix& matrix, ndVector& p0, ndVect
 	ndShapeConvex::CalculateAabb(matrix, p0, p1);
 }
 
+ndUnsigned64 ndShapeCylinder::GetHash(ndUnsigned64 hash) const
+{
+	ndShapeInfo info(GetShapeInfo());
+	return info.GetHash(hash);
+}

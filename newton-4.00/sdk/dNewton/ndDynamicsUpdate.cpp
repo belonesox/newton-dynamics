@@ -156,7 +156,8 @@ void ndDynamicsUpdate::SortBodyJointScan()
 	ndArray<ndInt32>& bodyJointIndex = GetJointForceIndexBuffer();
 	const ndInt32 bodyJointIndexCount = scene->GetActiveBodyArray().GetCount() + 1;
 	bodyJointIndex.SetCount(bodyJointIndexCount);
-	ClearBuffer(&bodyJointIndex[0], bodyJointIndexCount * ndInt32 (sizeof(ndInt32)));
+	//ClearBuffer(&bodyJointIndex[0], bodyJointIndexCount * ndInt32 (sizeof(ndInt32)));
+	ndMemSet(&bodyJointIndex[0], 0, bodyJointIndexCount);
 
 	for (ndInt32 i = 0; i < jointArray.GetCount(); ++i)
 	{
@@ -721,7 +722,8 @@ void ndDynamicsUpdate::GetJacobianDerivatives(ndConstraint* const joint)
 				skeleton0->AddCloseLoopJoint(contactJoint);
 			}
 		}
-		else if (contactJoint->IsSkeletonIntraCollision())
+		//else if (contactJoint->IsSkeletonIntraCollision())
+		else
 		{
 			if (skeleton0 && !skeleton1)
 			{
@@ -990,8 +992,10 @@ void ndDynamicsUpdate::IntegrateBodiesVelocity()
 			ndBodyKinematic* const body = bodyArray[i];
 
 			ndAssert(body);
-			ndAssert(body->GetAsBodyDynamic());
 			ndAssert(body->m_isConstrained);
+			// no necessary anymore because the virtual function handle it.
+			//ndAssert(body->GetAsBodyDynamic()); 
+
 			const ndInt32 index = body->m_index;
 			const ndJacobian& forceAndTorque = internalForces[index];
 			const ndVector force(body->GetForce() + forceAndTorque.m_linear);
@@ -1050,7 +1054,7 @@ void ndDynamicsUpdate::UpdateForceFeedback()
 				rhs->m_jointFeebackForce->m_impact = rhs->m_maxImpact * timestepRK;
 			}
 
-			if (joint->GetAsBilateral())
+			//if (joint->GetAsBilateral())
 			{
 				ndVector force0(zero);
 				ndVector force1(zero);
@@ -1067,11 +1071,11 @@ void ndDynamicsUpdate::UpdateForceFeedback()
 					force1 += lhs->m_Jt.m_jacobianM1.m_linear * f;
 					torque1 += lhs->m_Jt.m_jacobianM1.m_angular * f;
 				}
-				ndJointBilateralConstraint* const bilateral = (ndJointBilateralConstraint*)joint;
-				bilateral->m_forceBody0 = force0;
-				bilateral->m_torqueBody0 = torque0;
-				bilateral->m_forceBody1 = force1;
-				bilateral->m_torqueBody1 = torque1;
+				//ndJointBilateralConstraint* const bilateral = (ndJointBilateralConstraint*)joint;
+				joint->m_forceBody0 = force0;
+				joint->m_torqueBody0 = torque0;
+				joint->m_forceBody1 = force1;
+				joint->m_torqueBody1 = torque1;
 			}
 		}
 	});
@@ -1101,8 +1105,7 @@ void ndDynamicsUpdate::IntegrateBodies()
 			ndBodyKinematic* const body = bodyArray[i];
 			if (!body->m_equilibrium)
 			{
-				body->m_accel = invTime * (body->m_veloc - body->m_accel);
-				body->m_alpha = invTime * (body->m_omega - body->m_alpha);
+				body->SetAcceleration(invTime * (body->m_veloc - body->m_accel), invTime * (body->m_omega - body->m_alpha));
 				body->IntegrateVelocity(timestep);
 			}
 			body->EvaluateSleepState(speedFreeze2, accelFreeze2);
@@ -1196,7 +1199,6 @@ void ndDynamicsUpdate::UpdateSkeletons()
 	D_TRACKTIME();
 	ndScene* const scene = m_world->GetScene();
 	const ndArray<ndSkeletonContainer*>& activeSkeletons = m_world->m_activeSkeletons;
-	//const ndBodyKinematic** const bodyArray = (const ndBodyKinematic**)(&scene->GetActiveBodyArray()[0]);
 
 	auto UpdateSkeletons = ndMakeObject::ndFunction([this, &activeSkeletons](ndInt32 threadIndex, ndInt32 threadCount)
 	{

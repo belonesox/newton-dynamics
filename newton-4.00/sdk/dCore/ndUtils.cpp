@@ -196,7 +196,7 @@ static ndInt32 SortVertices(
 	{
 		ndInt32 dst = (baseCount + i) * stride;
 		ndInt32 src = remapIndex[i].m_vertexIndex * stride;
-		memcpy(&vertListOut[dst], &vertexList[src], stride * sizeof(ndFloat64));
+		ndMemCpy(&vertListOut[dst], &vertexList[src], stride);
 	}
 	
 	for (ndInt32 i = 0; i < cluster.m_count; ++i)
@@ -375,7 +375,7 @@ void ndThreadYield()
 
 ndFloatExceptions::ndFloatExceptions(ndUnsigned32 mask)
 {
-	#if (defined (WIN32) || defined(_WIN32))
+	#if defined (_MSC_VER)
 		_clearfp();
 		m_floatMask = _controlfp(0, 0);
 		_controlfp(m_floatMask & ~mask, _MCW_EM);
@@ -393,6 +393,7 @@ ndFloatExceptions::ndFloatExceptions(ndUnsigned32 mask)
 
 	//ndFloat32 a = ndFloat32(1.0f);
 	//ndFloat32 b = ndFloat32(0.1f);
+	//ndFloat32 c = ndFloat32(0.0f);
 	//ndInt32 count = 0;
 	//while (a != 0.0f)
 	//{
@@ -408,7 +409,8 @@ ndFloatExceptions::~ndFloatExceptions()
 		_mm_setcsr(m_simdMask);
 	#endif
 
-	#if (defined (WIN32) || defined(_WIN32))
+	//#if (defined (WIN32) || defined(_WIN32))
+	#if defined (_MSC_VER)
 		_clearfp();
 		_controlfp(m_floatMask, _MCW_EM);
 	#endif

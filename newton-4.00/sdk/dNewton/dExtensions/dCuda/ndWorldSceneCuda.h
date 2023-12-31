@@ -21,10 +21,13 @@
 
 #include <ndNewtonStdafx.h>
 #include <ndCudaContext.h>
+#include <ndCudaSphFluid.h>
 #include <ndCudaBodyProxy.h>
 #include <ndDynamicsUpdate.h>
 
-class ndWorldSceneCuda : public ndWorldScene, public ndCudaContext
+class ndCudaContext;
+
+class ndWorldSceneCuda : public ndWorldScene
 {
 	public:
 	ndWorldSceneCuda(const ndWorldScene& src);
@@ -32,27 +35,41 @@ class ndWorldSceneCuda : public ndWorldScene, public ndCudaContext
 
 	virtual void Begin();
 	virtual void End();
-	virtual bool IsGPU() const;
+	virtual void Cleanup();
+	virtual void PrepareCleanup();
 	virtual bool IsValid() const;
-	virtual double GetGPUTime() const;
-
-	virtual void ApplyExtForce();
-	virtual void BalanceScene();
-	virtual void InitBodyArray();
-	virtual void UpdateBodyList();
-	virtual void CalculateContacts();
-	virtual void FindCollidingPairs();
-
-	//virtual void FindCollidingPairs(ndBodyKinematic* const body);
+	virtual bool IsHighPerformanceCompute() const;
+	
+	//virtual void ApplyExtForce();
+	//virtual void BalanceScene();
+	//virtual void InitBodyArray();
+	//virtual void UpdateBodyList();
+	//virtual void CalculateContacts();
+	//virtual void FindCollidingPairs();
+	//
+	////virtual void FindCollidingPairs(ndBodyKinematic* const body);
 	//virtual void CalculateContacts(ndInt32 threadIndex, ndContact* const contact);
+	
+	//void LoadBodyData();
+	//void GetBodyTransforms();
+	//ndCudaContext* GetContext();
 
 	virtual void UpdateTransform();
-	void LoadBodyData();
-	void GetBodyTransforms();
 
-	ndCudaContext* GetContext();
+	virtual void ParticleUpdate(ndFloat32 timestep);
+	virtual bool AddParticle(ndSharedPtr<ndBody>& particle);
+	virtual bool RemoveParticle(ndSharedPtr<ndBody>& particle);
 
-	ndArray<ndCudaBodyProxy> m_bodyBufferCpu;
+
+	//ndArray<ndCudaBodyProxy> m_bodyBufferCpu;
+	//
+	//friend class ndDynamicsUpdateCuda;
+
+	private:
+	void Addparticle(ndBodySphFluid* const fluid);
+
+	ndCudaContext* m_context;
+	ndSpecialList<ndCudaSphFluid> m_fluidParticles;
 
 	friend class ndDynamicsUpdateCuda;
 };

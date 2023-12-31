@@ -15,6 +15,7 @@
 #pragma once
 #ifndef _ND_VHACD_VECTOR_H_
 #define _ND_VHACD_VECTOR_H_
+#include <cstdint>
 #include <iostream>
 #include <math.h>
 

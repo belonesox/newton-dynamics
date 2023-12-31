@@ -15,6 +15,7 @@
 #pragma once
 #ifndef ND_VHACD_MESH_H
 #define ND_VHACD_MESH_H
+#include <cstdint>
 #include "vhacdSArray.h"
 #include "vhacdVector.h"
 
